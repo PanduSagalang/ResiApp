@@ -10,6 +10,9 @@ module.exports = (sequelize, DataTypes) => {
      * The `models/index` file will call this method automatically.
      */
     static associate(models) {
+      // Toko milik 1 User (opsional)
+      Toko.belongsTo(models.User, { foreignKey: 'user_id', as: 'user' });
+
       // 1 Toko punya banyak Resi
       Toko.hasMany(models.Resi, {
         foreignKey: 'toko_id',
@@ -33,16 +36,20 @@ module.exports = (sequelize, DataTypes) => {
       primaryKey: true,
       autoIncrement: true
     },
+    user_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
     nama_toko:{
-    type: DataTypes.STRING,
-    allowNull: false
-  }
- }, {
+      type: DataTypes.STRING,
+      allowNull: false
+    }
+  }, {
     sequelize,
     modelName: 'Toko',
     tableName: 'toko',
     timestamps: true,
-    createdAt: 'created_at',
+    createdAt: 'createdAt',
     updatedAt: false
   });
   return Toko;
