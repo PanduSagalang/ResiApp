@@ -11,6 +11,11 @@ app.use(express.urlencoded({ extended: true }));
 
 // Import routes
 const tokoRoutes = require('./routes/toko.routes');
+const uploadRoutes = require('./routes/upload.routes');
+const produkRoutes = require('./routes/produk.routes');
+const resiRoutes = require('./routes/resi.routes');
+const laporanRoutes = require('./routes/laporan.routes');
+const notaRoutes = require('./routes/nota.routes');
 
 app.get('/', (req, res) => {
     res.json({
@@ -21,6 +26,11 @@ app.get('/', (req, res) => {
 
 // Routes
 app.use('/api/toko', tokoRoutes);
+app.use('/api/upload', uploadRoutes);
+app.use('/api/produk', produkRoutes);
+app.use('/api/resi', resiRoutes);
+app.use('/api/laporan', laporanRoutes);
+app.use('/api/nota', notaRoutes);
 
 async function startServer() {
     try{

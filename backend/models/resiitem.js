@@ -10,12 +10,15 @@ module.exports = (sequelize, DataTypes) => {
      * The `models/index` file will call this method automatically.
      */
     static associate(models) {
-      ResiItem.belongsTo(models.Resi,{
-      foreignKey:'resi_id',
-      as:'resi',
-      // define association here
-    });
-  }
+      ResiItem.belongsTo(models.Resi, {
+        foreignKey: 'resi_id',
+        as: 'resi'
+      });
+      ResiItem.belongsTo(models.ProdukMaster, {
+        foreignKey: 'produk_master_id',
+        as: 'produk_master'
+      });
+    }
 }
   ResiItem.init({
     resi_id: {
