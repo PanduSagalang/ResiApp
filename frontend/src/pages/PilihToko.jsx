@@ -17,9 +17,11 @@ function PilihToko({ onSelect }) {
       setLoading(true);
       const res = await tokoAPI.getAll();
       setTokos(res.data.data || []);
+      if (res.data.total === 1) {
+        onSelect(res.data.data[0]);
+      }
     } catch (err) {
       setError('Gagal memuat daftar toko');
-      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -31,7 +33,6 @@ function PilihToko({ onSelect }) {
       setError('Nama toko tidak boleh kosong');
       return;
     }
-
     try {
       const res = await tokoAPI.create({ nama_toko: namaToko });
       setTokos([...tokos, res.data.data]);
@@ -45,95 +46,87 @@ function PilihToko({ onSelect }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <div className="text-xl text-gray-600">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
-      <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8">
-        <h1 className="text-3xl font-bold text-center mb-8 text-gray-800">
-          Aplikasi Resi Shopee
-        </h1>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-12">
+      <div className="w-full max-w-sm">
+        <div className="text-center mb-8">
+          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">ResiApp</h1>
+          <p className="text-sm text-gray-500 mt-1">Manajemen Resi Shopee</p>
+        </div>
 
-        {error && (
-          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">
-            {error}
-          </div>
-        )}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 text-red-600 text-sm rounded-lg border border-red-100">
+              {error}
+            </div>
+          )}
 
-        {showForm ? (
-          <form onSubmit={handleCreate} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Nama Toko Baru
-              </label>
-              <input
-                type="text"
-                value={namaToko}
-                onChange={(e) => setNamaToko(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Contoh: Toko A"
-                autoFocus
-              />
-            </div>
-            <div className="flex space-x-2">
-              <button
-                type="submit"
-                className="flex-1 bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
-              >
-                Simpan
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowForm(false);
-                  setNamaToko('');
-                  setError('');
-                }}
-                className="flex-1 bg-gray-300 text-gray-700 py-2 rounded hover:bg-gray-400"
-              >
-                Batal
-              </button>
-            </div>
-          </form>
-        ) : (
-          <>
-            <div className="mb-4">
-              <h2 className="text-lg font-semibold text-gray-700 mb-3">
-                Pilih Toko
-              </h2>
+          {showForm ? (
+            <form onSubmit={handleCreate} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Nama Toko Baru
+                </label>
+                <input
+                  type="text"
+                  value={namaToko}
+                  onChange={(e) => setNamaToko(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                  placeholder="Contoh: Toko A"
+                  autoFocus
+                />
+              </div>
+              <div className="flex space-x-3">
+                <button
+                  type="submit"
+                  className="flex-1 bg-gray-900 text-white py-2 rounded-lg hover:bg-gray-800 text-sm font-medium transition-colors"
+                >
+                  Simpan
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowForm(false); setNamaToko(''); setError(''); }}
+                  className="flex-1 bg-gray-100 text-gray-700 py-2 rounded-lg hover:bg-gray-200 text-sm font-medium transition-colors"
+                >
+                  Batal
+                </button>
+              </div>
+            </form>
+          ) : (
+            <>
               {tokos.length === 0 ? (
-                <p className="text-gray-500 text-center py-4">
-                  Belum ada toko. Buat toko baru untuk memulai.
-                </p>
+                <div className="text-center py-8">
+                  <p className="text-sm text-gray-500">Belum ada toko. Buat toko baru untuk memulai.</p>
+                </div>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-2 mb-6">
                   {tokos.map((t) => (
                     <button
                       key={t.id}
                       onClick={() => onSelect(t)}
-                      className="w-full text-left px-4 py-3 border border-gray-300 rounded hover:bg-blue-50 hover:border-blue-500 transition"
+                      className="w-full text-left px-4 py-3 border border-gray-200 rounded-lg hover:border-gray-400 hover:bg-gray-50 transition-all text-sm"
                     >
-                      <span className="font-medium text-gray-800">
-                        {t.nama_toko}
-                      </span>
+                      <span className="font-medium text-gray-900">{t.nama_toko}</span>
                     </button>
                   ))}
                 </div>
               )}
-            </div>
 
-            <button
-              onClick={() => setShowForm(true)}
-              className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700"
-            >
-              + Tambah Toko Baru
-            </button>
-          </>
-        )}
+              <button
+                onClick={() => setShowForm(true)}
+                className="w-full bg-gray-900 text-white py-2.5 rounded-lg hover:bg-gray-800 text-sm font-medium transition-colors"
+              >
+                + Tambah Toko Baru
+              </button>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

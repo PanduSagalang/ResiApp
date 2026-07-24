@@ -32,6 +32,20 @@ app.use('/api/resi', resiRoutes);
 app.use('/api/laporan', laporanRoutes);
 app.use('/api/nota', notaRoutes);
 
+const fs = require('fs');
+
+// Global error handler — prevent silent crashes
+process.on('uncaughtException', (err) => {
+    const msg = `[${new Date().toISOString()}] UNCAUGHT EXCEPTION: ${err.stack}\n`;
+    console.error(msg);
+    fs.appendFileSync('crash.log', msg);
+});
+process.on('unhandledRejection', (reason, promise) => {
+    const msg = `[${new Date().toISOString()}] UNHANDLED REJECTION: ${reason.stack || reason}\n`;
+    console.error(msg);
+    fs.appendFileSync('crash.log', msg);
+});
+
 async function startServer() {
     try{
         await sequelize.authenticate();

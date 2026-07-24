@@ -57,10 +57,15 @@ router.put('/:id', async (req, res) => {
     const resi = await Resi.findByPk(req.params.id);
     if (!resi) return res.status(404).json({ success: false, message: 'Not found' });
     
-    await resi.update(req.body);
-    res.status(200).json({ success: true, data: resi });
+    const allowed = ['no_resi','no_pesanan','penerima_nama','penerima_alamat','pengirim','berat','tanggal_pesan','status'];
+    const update = {};
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) update[key] = req.body[key];
+    }
+    await resi.update(update);
+    return res.status(200).json({ success: true, data: resi });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    return res.status(500).json({ success: false, message: err.message });
   }
 });
 
@@ -72,9 +77,9 @@ router.delete('/:id', async (req, res) => {
     const resi = await Resi.findByPk(req.params.id);
     if (!resi) return res.status(404).json({ success: false, message: 'Not found' });
     await resi.destroy();
-    res.status(200).json({ success: true, message: 'Deleted' });
+    return res.status(200).json({ success: true, message: 'Deleted' });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    return res.status(500).json({ success: false, message: err.message });
   }
 });
 
@@ -99,11 +104,11 @@ router.post('/:id/retur', async (req, res) => {
       retur = await Retur.create({ resi_id: id, alasan, jumlah_potongan, tanggal_retur });
     }
     
-    await hitungTransaksi(id); // Recalculate - untung potong retur
+    await hitungTransaksi(id);
     
-    res.status(200).json({ success: true, message: 'Retur diproses', data: retur });
+    return res.status(200).json({ success: true, message: 'Retur diproses', data: retur });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    return res.status(500).json({ success: false, message: err.message });
   }
 });
 

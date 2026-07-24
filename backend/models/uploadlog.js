@@ -19,6 +19,10 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.INTEGER,
       defaultValue: 0
     },
+    uploaded_at: {
+      type: DataTypes.DATE,
+      defaultValue: DataTypes.NOW
+    },
     file_dihapus_pada: {
       type: DataTypes.DATE,
       allowNull: true
@@ -27,9 +31,7 @@ module.exports = (sequelize, DataTypes) => {
     sequelize,
     modelName: 'UploadLog',
     tableName: 'upload_log',
-    timestamps: true,
-    createdAt: 'uploaded_at',
-    updatedAt: false
+    timestamps: false
   });
   return UploadLog;
 };

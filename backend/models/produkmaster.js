@@ -41,7 +41,7 @@ module.exports = (sequelize, DataTypes) => {
     sequelize,
     modelName: 'ProdukMaster',
     tableName: 'produk_master',
-    timestamps: true
+    timestamps: false
   });
   return ProdukMaster;
 };

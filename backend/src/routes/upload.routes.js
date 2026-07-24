@@ -178,7 +178,7 @@ router.post('/:tokoId', upload.single('file'), async (req, res) => {
         // Tidak throw error, karena upload sudah berhasil
       }
 
-      res.status(200).json({
+      return res.status(200).json({
         success: true,
         message: `${savedResis.length} resi berhasil diupload`,
         data: {
@@ -192,7 +192,7 @@ router.post('/:tokoId', upload.single('file'), async (req, res) => {
     } catch (parseErr) {
       console.error('Parse error:', parseErr);
       fs.unlinkSync(req.file.path);
-      res.status(400).json({
+      return res.status(400).json({
         success: false,
         message: 'Gagal memproses file: ' + parseErr.message
       });
