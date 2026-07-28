@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { resi as resiAPI, nota as notaAPI } from '../services/api';
+import api from '../services/api';
 
 function DashboardResi({ toko }) {
   const [resis, setResis] = useState([]);
+  const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
@@ -15,15 +17,13 @@ function DashboardResi({ toko }) {
   useEffect(() => { fetchResis(); }, [toko.id]);
 
   const fetchResis = async () => {
-    try { setLoading(true);
-      const params = {};
-      if (search) params.search = search;
-      if (status) params.status = status;
-      if (tglMulai) params.tgl_mulai = tglMulai;
-      if (tglSelesai) params.tgl_selesai = tglSelesai;
-      const res = await resiAPI.getAll(toko.id, params);
+    try {
+      setLoading(true);
+      const res = await resiAPI.getAll(toko.id, { search, status, tgl_mulai: tglMulai, tgl_selesai: tglSelesai });
       setResis(res.data.data || []);
-    } catch (err) { console.error(err); }
+      const sum = await api.get(`/resi/summary/${toko.id}`, { params: { tgl_mulai: tglMulai, tgl_selesai: tglSelesai }});
+      setSummary(sum.data.data);
+    } catch (err) { console.error('Fetch resis:', err); }
     finally { setLoading(false); }
   };
 
@@ -51,6 +51,12 @@ function DashboardResi({ toko }) {
     const alasan = window.prompt('Alasan retur:'); if (!alasan) return;
     const potongan = window.prompt('Potongan (Rp):'); if (!potongan) return;
     try { await resiAPI.retur(id, { alasan, jumlah_potongan: parseFloat(potongan), tanggal_retur: new Date().toISOString().split('T')[0] }); fetchResis(); }
+    catch (err) { alert(err.response?.data?.message || 'Gagal'); }
+  };
+
+  const handleCancel = async (id) => {
+    if (!window.confirm('Yakin batalkan resi ini?')) return;
+    try { await resiAPI.cancel(id); fetchResis(); }
     catch (err) { alert(err.response?.data?.message || 'Gagal'); }
   };
 
@@ -94,6 +100,20 @@ function DashboardResi({ toko }) {
         </div>
       </form>
 
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+        {[
+          { label: 'Total Pesanan', value: summary?.total_pesanan, prefix: '' },
+          { label: 'Penghasilan Kotor', value: summary?.total_kotor, prefix: 'Rp ' },
+          { label: 'Penghasilan Bersih', value: summary?.total_bersih, prefix: 'Rp ' },
+          { label: 'Estimasi Laba', value: (summary?.total_kotor || 0) - (summary?.total_bersih || 0), prefix: 'Rp ' },
+        ].map(card => (
+          <div key={card.label} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+            <p className="text-xs text-gray-500 font-medium">{card.label}</p>
+            <p className="text-lg font-bold text-gray-800 mt-1">{card.prefix}{fmt(card.value)}</p>
+          </div>
+        ))}
+      </div>
+
       {resis.length === 0 ? (
         <div className="bg-white border border-gray-200 rounded-lg p-12 text-center"><p className="text-sm text-gray-500">Belum ada resi.</p></div>
       ) : (
@@ -124,6 +144,7 @@ function DashboardResi({ toko }) {
                                 <div className="flex gap-3 text-sm">
                                   <button onClick={() => handleDetail(r.id)} className="text-indigo-600 hover:text-indigo-800 font-medium">Detail</button>
                                   {r.status === 'aktif' && <button onClick={() => handleRetur(r.id)} className="text-amber-600 hover:text-amber-800 font-medium">Retur</button>}
+                                  {r.status === 'aktif' && <button onClick={() => handleCancel(r.id)} className="text-sky-600 hover:text-sky-800 font-medium">Batalkan</button>}
                                   <button onClick={() => handleDelete(r.id)} className="text-rose-600 hover:text-rose-800 font-medium">Hapus</button>
                                 </div>
                               </td>

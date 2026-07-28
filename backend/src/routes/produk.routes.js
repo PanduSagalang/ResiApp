@@ -14,7 +14,8 @@ const Toko = db.Toko;
 router.post('/:tokoId', async (req, res) => {
   try {
     const { tokoId } = req.params;
-    const { nama_produk, variasi, harga_beli, harga_jual, admin_persen, ppn_persen } = req.body;
+    const { nama_produk, variasi, harga_beli, harga_jual, admin_persen } = req.body;
+    const ppn_persen = req.body.ppn_persen !== undefined ? req.body.ppn_persen : 10;
 
     // Validasi toko
     const toko = await Toko.findByPk(tokoId);
@@ -126,7 +127,8 @@ router.get('/:tokoId', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { nama_produk, variasi, harga_beli, harga_jual, admin_persen, ppn_persen } = req.body;
+    const { nama_produk, variasi, harga_beli, harga_jual, admin_persen } = req.body;
+    const ppn_persen = req.body.ppn_persen !== undefined ? req.body.ppn_persen : 10;
 
     const produk = await ProdukMaster.findByPk(id);
     if (!produk) {

@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../../models');
 const { Op } = require('sequelize');
-const { hitungTransaksi } = require('../services/kalkulasi.service');
+const { hitungTransaksi, getDashboardSummary } = require('../services/kalkulasi.service');
 
 const Resi = db.Resi;
 const ResiItem = db.ResiItem;
@@ -128,6 +128,33 @@ router.post('/:id/retur', async (req, res) => {
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }
+});
+
+/**
+ * POST /api/resi/:id/cancel — Batalkan resi
+ */
+router.post('/:id/cancel', async (req, res) => {
+  try {
+    const resi = await Resi.findByPk(id);
+    if (!resi) return res.status(404).json({ success: false, message: 'Not found' });
+    await resi.update({ status: 'dibatalkan' });
+    await hitungTransaksi(resi.id);
+    return res.json({ success: true, message: 'Resi dibatalkan' });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * GET /api/resi/summary/:tokoId — ringkasan dashboard cards
+ */
+router.get('/summary/:tokoId', async (req, res) => {
+  try {
+    const { tgl_mulai, tgl_selesai } = req.query;
+    if (!tgl_mulai || !tgl_selesai) return res.status(400).json({ message: 'tgl_mulai dan tgl_selesai required' });
+    const summary = await getDashboardSummary(req.params.tokoId, tgl_mulai, tgl_selesai);
+    res.json({ success: true, data: summary });
+  } catch (err) { res.status(500).json({ message: err.message }); }
 });
 
 module.exports = router;

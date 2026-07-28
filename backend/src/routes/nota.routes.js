@@ -1,10 +1,12 @@
 const express = require('express');
 const router = express.Router();
+const path = require('path');
 const db = require('../../models');
 const { Op } = require('sequelize');
 const XLSX = require('xlsx');
 
-// Helper function used by both JSON and Excel
+const ProdukMaster = db.ProdukMaster;
+const { getCustomerDir, getNextInvoiceNumber, invoiceFileName, generatePDF, generateExcel } = require('../services/offlineNota.service');
 async function getNotaData(tokoId, tglMulai, tglSelesai) {
   const toko = await db.Toko.findByPk(tokoId);
   if (!toko) return null;
@@ -23,23 +25,28 @@ async function getNotaData(tokoId, tglMulai, tglSelesai) {
   const itemMap = {};
   for (const r of resis) {
     for (const item of r.items) {
-      const key = `${item.nama_produk}|${item.variasi || ''}`;
-      if (!itemMap[key]) itemMap[key] = { nama_produk: item.nama_produk, variasi: item.variasi, qty: 0, harga_beli: 0, harga_jual: 0, subtotal_beli: 0, subtotal_jual: 0 };
+      const v = item.produk_master?.variasi || item.variasi || '';
+      const key = `${item.nama_produk}|${v}`;
+      if (!itemMap[key]) itemMap[key] = { nama_produk: item.nama_produk, variasi: v, qty: 0, harga_beli: 0, harga_jual: 0, subtotal_beli: 0, subtotal_jual: 0 };
       itemMap[key].qty += item.qty;
-      itemMap[key].subtotal_beli += (item.produk_master?.harga_beli || 0) * item.qty;
-      itemMap[key].subtotal_jual += (item.produk_master?.harga_jual || 0) * item.qty;
+      const hb = parseFloat(item.produk_master?.harga_beli || 0);
+      itemMap[key].harga_beli = hb;
+      itemMap[key].harga_jual = hb; // For reseller, jual = hpp
+      itemMap[key].subtotal_beli += hb * item.qty;
+      itemMap[key].subtotal_jual += hb * item.qty;
     }
   }
 
   let totalBeli = 0, totalJual = 0, totalAdmin = 0, totalPpn = 0, totalKotor = 0, totalBersih = 0;
   for (const r of resis) {
     if (r.transaksi) {
-      totalBeli += parseFloat(r.transaksi.hpp_total) || 0;
-      totalJual += parseFloat(r.transaksi.harga_jual_total) || 0;
-      totalAdmin += parseFloat(r.transaksi.admin_fee) || 0;
-      totalPpn += parseFloat(r.transaksi.ppn) || 0;
-      totalKotor += parseFloat(r.transaksi.penghasilan_kotor) || 0;
-      totalBersih += parseFloat(r.transaksi.penghasilan_bersih) || 0;
+      const hpp = parseFloat(r.transaksi.hpp_total) || 0;
+      totalBeli += hpp;
+      totalJual += hpp; // For reseller, jual = hpp
+      totalAdmin += 0;
+      totalPpn += 0;
+      totalKotor += hpp;
+      totalBersih += hpp;
     }
   }
 
@@ -163,6 +170,79 @@ router.get('/resi/:resiId', async (req, res) => {
     });
     if (!resi) return res.status(404).json({ success: false, message: 'Not found' });
     res.json({ success: true, data: resi });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * POST /api/nota/offline/:tokoId
+ * Buat nota transaksi offline (tanpa PPN)
+ * Body: { pembeli, alamat, ongkir, biaya_lain, items: [{ produk_master_id, nama, qty, harga }] }
+ * Response: { data: {...}, pdf_path, xlsx_buffer }
+ */
+router.post('/offline/:tokoId', async (req, res) => {
+  try {
+    const { tokoId } = req.params;
+    const { pembeli, alamat, ongkir = 0, biaya_lain = 0, items } = req.body;
+    if (!pembeli || !items || items.length === 0) {
+      return res.status(400).json({ success: false, message: 'Data tidak lengkap' });
+    }
+
+    // Grab product names from DB for dropdown, but allow manual override
+    const ids = items.map(i => i.produk_master_id).filter(Boolean);
+    const produk = ids.length > 0 ? await ProdukMaster.findAll({ where: { id: ids, toko_id: tokoId } }) : [];
+    const produkMap = {};
+    produk.forEach(p => { produkMap[p.id] = p; });
+
+    const detailItems = [];
+    let subtotal_barang = 0;
+    for (const item of items) {
+      const p = item.produk_master_id ? produkMap[item.produk_master_id] : null;
+      const nama_produk = item.nama || (p ? p.nama_produk + (p.variasi ? ' ' + p.variasi : '') : '');
+      const harga = parseFloat(String(item.harga).replace(/,/g, '')) || (p ? parseFloat(p.harga_beli) : 0);
+      const qty = parseInt(item.qty) || 1;
+      const sub = harga * qty;
+      detailItems.push({ nama_produk, qty, harga, subtotal: sub });
+      subtotal_barang += sub;
+    }
+
+    const ongkirNum = parseFloat(ongkir) || 0;
+    const biayaLainNum = parseFloat(biaya_lain) || 0;
+    const grandTotal = subtotal_barang + ongkirNum + biayaLainNum;
+
+    // Generate invoice number & file
+    const customerDir = getCustomerDir(pembeli);
+    const invoiceNum = getNextInvoiceNumber(customerDir);
+    const pdfName = invoiceFileName(invoiceNum);
+    const pdfPath = path.join(customerDir, pdfName);
+
+    const data = {
+      no_invoice: pdfName.replace('.pdf', ''),
+      tgl: new Date().toISOString().split('T')[0],
+      pembeli,
+      alamat: alamat || '',
+      items: detailItems,
+      subtotal_barang,
+      ongkir: ongkirNum,
+      biaya_lain: biayaLainNum,
+      grand_total: grandTotal
+    };
+
+    await generatePDF(data, pdfPath);
+
+    // Also return Excel
+    const xlsxBuf = generateExcel(data);
+
+    res.json({
+      success: true,
+      data: {
+        ...data,
+        message: `Nota ${pembeli}: Rp${grandTotal.toLocaleString('id-ID')}`,
+        file: pdfPath,
+        xlsx: xlsxBuf.toString('base64')
+      }
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

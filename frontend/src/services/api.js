@@ -70,6 +70,7 @@ export const resi = {
   update: (id, data) => api.put(`/resi/${id}`, data),
   delete: (id) => api.delete(`/resi/${id}`),
   retur: (id, data) => api.post(`/resi/${id}/retur`, data),
+  cancel: (id) => api.post(`/resi/${id}/cancel`),
   bulkDelete: (ids) => api.post('/resi/bulk-delete', { ids }),
 };
 
@@ -89,6 +90,7 @@ export const nota = {
   get: (resiId) => api.get(`/nota/resi/${resiId}`),
   bulanan: (tokoId, params) => api.get(`/nota/toko/${tokoId}/bulanan`, { params }),
   exportExcel: (tokoId, params) => api.get(`/nota/toko/${tokoId}/export-excel`, { params, responseType: 'blob' }),
+  offline: (tokoId, data) => api.post(`/nota/offline/${tokoId}`, data),
 };
 
 export default api;

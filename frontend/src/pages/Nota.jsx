@@ -1,9 +1,14 @@
 import { useState, useEffect } from 'react';
-import { nota as notaAPI } from '../services/api';
+import { nota as notaAPI, produk as produkAPI } from '../services/api';
 
 function Nota({ toko }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [showOffline, setShowOffline] = useState(false);
+  const [produks, setProduks] = useState([]);
+  const [offlineForm, setOfflineForm] = useState({ pembeli: '', alamat: '', ongkir: 0, biaya_lain: 0, items: [{ produk_master_id: '', nama: '', qty: 1, harga: '' }] });
+  const [offlineResult, setOfflineResult] = useState(null);
+
   const now = new Date();
   const today = now.toISOString().split('T')[0];
   const startWeek = new Date(now);
@@ -36,6 +41,65 @@ function Nota({ toko }) {
     } catch (err) { alert('Gagal export Excel'); }
   };
 
+  const openOffline = async () => {
+    try {
+      const res = await produkAPI.getAll(toko.id);
+      setProduks(res.data.data || []);
+      setShowOffline(true);
+      setOfflineResult(null);
+      setOfflineForm({ pembeli: '', alamat: '', ongkir: 0, biaya_lain: 0, items: [{ produk_master_id: '', nama: '', qty: 1, harga: '' }] });
+    } catch (err) { alert('Gagal muat produk'); }
+  };
+
+  const addItem = () => setOfflineForm(f => ({ ...f, items: [...f.items, { produk_master_id: '', nama: '', qty: 1, harga: '' }] }));
+  const rmItem = (i) => setOfflineForm(f => ({ ...f, items: f.items.filter((_, idx) => idx !== i) }));
+  const updItem = (i, k, v) => {
+    const items = [...offlineForm.items];
+    if (k === 'produk_master_id') {
+      const p = produks.find(x => x.id === parseInt(v));
+      items[i].produk_master_id = v;
+      items[i].nama = p ? `${p.nama_produk}${p.variasi ? ' ' + p.variasi : ''}` : '';
+      items[i].harga = p ? p.harga_beli : '';
+    } else {
+      items[i][k] = v;
+    }
+    setOfflineForm(f => ({ ...f, items }));
+  };
+  const updForm = (k, v) => setOfflineForm(f => ({ ...f, [k]: v }));
+
+  const handleOfflineSubmit = async (e) => {
+    e.preventDefault();
+    if (!offlineForm.pembeli.trim()) { alert('Isi nama pembeli'); return; }
+    try {
+      const res = await notaAPI.offline(toko.id, {
+        pembeli: offlineForm.pembeli.trim(),
+        alamat: offlineForm.alamat.trim(),
+        ongkir: parseFloat(offlineForm.ongkir) || 0,
+        biaya_lain: parseFloat(offlineForm.biaya_lain) || 0,
+        items: offlineForm.items.map(i => ({
+          produk_master_id: parseInt(i.produk_master_id) || null,
+          nama: i.nama,
+          qty: parseInt(i.qty) || 1,
+          harga: parseFloat(String(i.harga).replace(/,/g, '')) || 0
+        }))
+      });
+      setOfflineResult(res.data.data);
+    } catch (err) { alert('Gagal buat nota offline'); }
+  };
+
+  const downloadExcel = () => {
+    if (!offlineResult?.xlsx) return;
+    const byteChars = atob(offlineResult.xlsx);
+    const bytes = new Uint8Array(byteChars.length);
+    for (let i = 0; i < byteChars.length; i++) bytes[i] = byteChars.charCodeAt(i);
+    const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `${offlineResult.no_invoice}.xlsx`);
+    document.body.appendChild(link); link.click(); link.remove();
+  };
+
   const setRange = (label, mulai, selesai) => { setFilterLabel(label); setTglMulai(mulai); setTglSelesai(selesai); };
 
   const presets = [
@@ -55,16 +119,19 @@ function Nota({ toko }) {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <h1 className="text-xl font-bold text-gray-800">Nota</h1>
         <div className="flex flex-wrap items-center gap-2">
+          <button onClick={openOffline}
+            className={`${btnBase} bg-emerald-600 text-white hover:bg-emerald-700 active:bg-emerald-800 w-full sm:w-auto`}>
+            + Nota Offline
+          </button>
           <div className="flex items-center gap-1">
             <input type="date" value={tglMulai} onChange={(e) => setRange('Filter', e.target.value, tglSelesai)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-36" />
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-32" />
             <span className="text-gray-400 text-sm">s/d</span>
             <input type="date" value={tglSelesai} onChange={(e) => setRange('Filter', tglMulai, e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-36" />
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-32" />
           </div>
           <button onClick={handleExport}
             className={`${btnBase} bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800 w-full sm:w-auto`}>
-            <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
             Export Excel
           </button>
         </div>
@@ -89,25 +156,23 @@ function Nota({ toko }) {
         <div className="space-y-6">
           <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
             <div className="flex justify-between items-start mb-4">
-              <div><h2 className="text-lg font-bold text-gray-800">NOTA</h2><p className="text-sm text-gray-500">{data.toko}</p></div>
+              <div><h2 className="text-lg font-bold text-gray-800">NOTA RESELLER</h2><p className="text-sm text-gray-500">{data.toko}</p></div>
               <div className="text-right"><p className="text-sm text-gray-500">Periode</p><p className="font-semibold text-gray-800">{data.periode}</p><p className="text-gray-400 text-xs mt-1">{data.total_resi} resi</p></div>
             </div>
           </div>
 
           <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
             <div className="overflow-x-auto -mx-3 sm:mx-0">
-              <div className="min-w-[700px] sm:min-w-0">
+              <div className="min-w-[600px] sm:min-w-0">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-gradient-to-r from-indigo-50 to-blue-50">
-                      <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">No</th>
+                      <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase">No</th>
                       <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Produk</th>
                       <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Variasi</th>
                       <th className="px-3 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Qty</th>
-                      <th className="px-3 py-3 text-right text-xs font-semibold text-gray-600 uppercase">H.Beli</th>
-                      <th className="px-3 py-3 text-right text-xs font-semibold text-gray-600 uppercase">H.Jual</th>
-                      <th className="px-3 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Sub. Beli</th>
-                      <th className="px-3 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Sub. Jual</th>
+                      <th className="px-3 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Harga</th>
+                      <th className="px-3 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Subtotal</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -118,9 +183,7 @@ function Nota({ toko }) {
                         <td className="px-3 py-2 text-gray-500">{item.variasi || '-'}</td>
                         <td className="px-3 py-2 text-right font-medium">{item.qty}</td>
                         <td className="px-3 py-2 text-right text-gray-600">Rp {fmt(item.harga_beli)}</td>
-                        <td className="px-3 py-2 text-right text-gray-600">Rp {fmt(item.harga_jual)}</td>
                         <td className="px-3 py-2 text-right font-medium">Rp {fmt(item.subtotal_beli)}</td>
-                        <td className="px-3 py-2 text-right font-medium">Rp {fmt(item.subtotal_jual)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -130,22 +193,118 @@ function Nota({ toko }) {
           </div>
 
           <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-            <h3 className="text-sm font-semibold text-gray-700 mb-4">Ringkasan Keuangan</h3>
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-              {[
-                { label: 'Total HPP', value: data.ringkasan.total_hpp, color: 'text-gray-800' },
-                { label: 'Total Jual', value: data.ringkasan.total_jual, color: 'text-gray-800' },
-                { label: 'Admin Fee', value: data.ringkasan.total_admin, color: 'text-rose-600' },
-                { label: 'PPN', value: data.ringkasan.total_ppn, color: 'text-rose-600' },
-                { label: 'Kotor', value: data.ringkasan.total_kotor, color: 'text-gray-800' },
-                { label: 'Bersih', value: data.ringkasan.total_bersih, color: 'text-emerald-700' },
-              ].map(r => (
-                <div key={r.label} className="bg-gradient-to-br from-gray-50 to-indigo-50/30 rounded-xl p-4 border border-indigo-100/50">
-                  <p className="text-xs text-gray-500 font-medium">{r.label}</p>
-                  <p className={`text-lg font-bold ${r.color} mt-1`}>Rp {fmt(r.value)}</p>
-                </div>
-              ))}
+            <h3 className="text-sm font-semibold text-gray-700 mb-4">Ringkasan</h3>
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
+              <div className="bg-gradient-to-br from-gray-50 to-indigo-50/30 rounded-xl p-4 border border-indigo-100/50">
+                <p className="text-xs text-gray-500 font-medium">Total Belanja (HPP)</p>
+                <p className="text-lg font-bold text-gray-800 mt-1">Rp {fmt(data.ringkasan.total_jual)}</p>
+              </div>
+              <div className="bg-gradient-to-br from-gray-50 to-emerald-50/30 rounded-xl p-4 border border-emerald-100/50">
+                <p className="text-xs text-gray-500 font-medium">Jumlah Resi</p>
+                <p className="text-lg font-bold text-gray-800 mt-1">{data.total_resi}</p>
+              </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Offline */}
+      {showOffline && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => !offlineResult && setShowOffline(false)}>
+          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            {offlineResult ? (
+              <div className="p-6 space-y-4">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-lg font-bold text-gray-800">Nota Offline</h2>
+                  <button onClick={() => setShowOffline(false)} className="text-gray-400 hover:text-gray-700 text-xl">&times;</button>
+                </div>
+                <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+                  <p className="font-semibold text-emerald-800">{offlineResult.message}</p>
+                  <p className="text-xs text-emerald-600 mt-1">Invoice: {offlineResult.no_invoice}</p>
+                </div>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div><span className="text-gray-500">Pembeli:</span> <span className="font-medium">{offlineResult.pembeli}</span></div>
+                  <div><span className="text-gray-500">Tanggal:</span> {offlineResult.tgl}</div>
+                </div>
+                <table className="w-full text-sm border border-gray-200 rounded-lg">
+                  <thead><tr className="bg-gray-50"><th className="px-3 py-2 text-left text-xs text-gray-500">Produk</th><th className="px-3 py-2 text-right text-xs text-gray-500">Qty</th><th className="px-3 py-2 text-right text-xs text-gray-500">Harga</th><th className="px-3 py-2 text-right text-xs text-gray-500">Sub</th></tr></thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {offlineResult.items.map((it, i) => (
+                      <tr key={i}><td className="px-3 py-2">{it.nama_produk}</td><td className="px-3 py-2 text-right">{it.qty}</td><td className="px-3 py-2 text-right">Rp{fmt(it.harga)}</td><td className="px-3 py-2 text-right font-medium">Rp{fmt(it.subtotal)}</td></tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div className="border-t border-gray-200 pt-2 space-y-1 text-sm text-right">
+                  {offlineResult.ongkir > 0 && <p>Ongkir: Rp{fmt(offlineResult.ongkir)}</p>}
+                  {offlineResult.biaya_lain > 0 && <p>Biaya Lain: Rp{fmt(offlineResult.biaya_lain)}</p>}
+                  <p className="text-lg font-bold text-gray-800">Grand Total: Rp{fmt(offlineResult.grand_total)}</p>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={downloadExcel}
+                    className={`${btnBase} bg-indigo-600 text-white hover:bg-indigo-700 w-full`}>Download Excel</button>
+                  <button onClick={() => { setShowOffline(false); setOfflineForm({pembeli:'', alamat:'', ongkir:0, biaya_lain:0, items:[{produk_master_id:'', nama:'', qty:1, harga:''}]}); }}
+                    className={`${btnBase} bg-gray-100 text-gray-700 hover:bg-gray-200 w-full`}>Tutup</button>
+                </div>
+                <p className="text-xs text-gray-400 text-center">PDF tersimpan di: {offlineResult.file}</p>
+              </div>
+            ) : (
+              <form onSubmit={handleOfflineSubmit}>
+                <div className="border-b border-gray-200 p-4 flex justify-between items-center">
+                  <h2 className="text-lg font-bold text-gray-800">Nota Offline</h2>
+                  <button type="button" onClick={() => setShowOffline(false)} className="text-gray-400 hover:text-gray-700 text-xl">&times;</button>
+                </div>
+                <div className="p-4 space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div><label className="block text-xs font-medium text-gray-600 mb-1">Nama Pembeli</label>
+                      <input value={offlineForm.pembeli} onChange={(e) => updForm('pembeli', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500" placeholder="Nama customer" /></div>
+                    <div><label className="block text-xs font-medium text-gray-600 mb-1">Alamat (opsional)</label>
+                      <input value={offlineForm.alamat} onChange={(e) => updForm('alamat', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500" placeholder="Alamat" /></div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-medium text-gray-600">Barang</label>
+                      <button type="button" onClick={addItem} className="text-xs text-indigo-600 hover:text-indigo-800 font-medium">+ Tambah Baris</button>
+                    </div>
+                    {offlineForm.items.map((item, i) => (
+                      <div key={i} className="flex gap-2 items-start">
+                        <select value={item.produk_master_id} onChange={(e) => updItem(i, 'produk_master_id', e.target.value)}
+                          className="w-2/5 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500">
+                          <option value="">-- Ketik manual / Pilih --</option>
+                          {produks.map(p => (
+                            <option key={p.id} value={p.id}>{p.nama_produk}{p.variasi ? ` (${p.variasi})` : ''} — Rp{fmt(p.harga_beli)}</option>
+                          ))}
+                        </select>
+                        <input value={item.nama} onChange={(e) => updItem(i, 'nama', e.target.value)} placeholder="Nama barang"
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500" />
+                        <input type="number" min="1" value={item.qty} onChange={(e) => updItem(i, 'qty', e.target.value)}
+                          className="w-16 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500" />
+                        <input type="number" min="0" value={item.harga} onChange={(e) => updItem(i, 'harga', e.target.value)} placeholder="Harga"
+                          className="w-28 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500" />
+                        {offlineForm.items.length > 1 && (
+                          <button type="button" onClick={() => rmItem(i)} className="text-rose-500 hover:text-rose-700 text-sm px-1">&times;</button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div><label className="block text-xs font-medium text-gray-600 mb-1">Ongkos Kirim</label>
+                      <input type="number" min="0" value={offlineForm.ongkir} onChange={(e) => updForm('ongkir', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500" placeholder="0" /></div>
+                    <div><label className="block text-xs font-medium text-gray-600 mb-1">Biaya Lain</label>
+                      <input type="number" min="0" value={offlineForm.biaya_lain} onChange={(e) => updForm('biaya_lain', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500" placeholder="0" /></div>
+                  </div>
+                </div>
+                <div className="border-t border-gray-200 p-4 flex justify-end gap-2">
+                  <button type="button" onClick={() => setShowOffline(false)} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium">Batal</button>
+                  <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium shadow-sm">Simpan & Cetak</button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}
