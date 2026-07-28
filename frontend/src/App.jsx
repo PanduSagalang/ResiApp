@@ -5,12 +5,14 @@ import DashboardResi from './pages/DashboardResi';
 import UploadResi from './pages/UploadResi';
 import MasterProduk from './pages/MasterProduk';
 import LaporanKeuangan from './pages/LaporanKeuangan';
+import Nota from './pages/Nota';
 
 const navItems = [
   { path: '/dashboard', label: 'Dashboard' },
   { path: '/upload', label: 'Upload' },
   { path: '/produk', label: 'Produk' },
   { path: '/laporan', label: 'Laporan' },
+  { path: '/nota', label: 'Nota' },
 ];
 
 function App() {
@@ -123,6 +125,7 @@ function App() {
           <Route path="/upload" element={<UploadResi toko={selectedToko} />} />
           <Route path="/produk" element={<MasterProduk toko={selectedToko} />} />
           <Route path="/laporan" element={<LaporanKeuangan toko={selectedToko} />} />
+          <Route path="/nota" element={<Nota toko={selectedToko} />} />
         </Routes>
       </main>
     </div>

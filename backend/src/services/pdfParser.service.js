@@ -1,122 +1,89 @@
 const { PDFParse } = require('pdf-parse');
 const fs = require('fs');
 
-/**
- * Parsing teks mentah dari file PDF resi Shopee
- * @param {string} filePath 
- * @returns {Promise<object>}
- */
-async function parseResiPDF(filePath) {
-  try {
-    const dataBuffer = fs.readFileSync(filePath);
-    const pdfParser = new PDFParse({ data: dataBuffer });
-    const textResult = await pdfParser.getText();
-    const teks = textResult.text;
+function parseSingleResi(teksBlock) {
+  const t = teksBlock.trim();
+  if (!t) return null;
 
-    // Pattern regex disesuaikan dengan template umum resi Shopee
-    // 1. No Resi
-    // Pola: "No. Resi: SPXID0291928" atau "No. Resi SPXID..." dll.
-    const noResiMatch = teks.match(/No\.?\s*Resi[:\s]*([A-Z0-9\-]+)/i) || 
-                        teks.match(/([A-Z0-9]{10,20})/); // Fallback string panjang alfanumerik
+  const noResi = (t.match(/No\.?\s*Resi[:\s]*([A-Z0-9]+)/i) || [])[1] || null;
+  if (!noResi) return null;
 
-    // 2. No Pesanan
-    // Pola: "No. Pesanan: 230912ABCDE"
-    const noPesananMatch = teks.match(/No\.?\s*Pesanan[:\s]*([A-Z0-9]+)/i) ||
-                           teks.match(/Pesanan\s*No[:\s]*([A-Z0-9]+)/i);
-
-    // 3. Penerima (Nama & Alamat)
-    // Pola: "Penerima: [Nama]" diikuti baris baru alamat
-    const penerimaMatch = teks.match(/Penerima[:\s]+([^\n\r]+)/i);
-    const penerimaNama = penerimaMatch ? penerimaMatch[1].trim() : null;
-
-    // Alamat Penerima
-    // Mencari block alamat setelah Penerima hingga baris Pengirim atau batas lain
-    let penerimaAlamat = null;
-    const alamatStartIndex = teks.indexOf('Penerima:');
-    if (alamatStartIndex !== -1) {
-      const alamatSlice = teks.substring(alamatStartIndex, alamatStartIndex + 300);
-      const lines = alamatSlice.split('\n').map(l => l.trim()).filter(Boolean);
-      // Ambil 3-4 baris setelah baris pertama "Penerima"
-      if (lines.length > 2) {
-        penerimaAlamat = lines.slice(2, 6).join(' ');
+  const lines = t.split('\n').map(l => l.trim()).filter(Boolean);
+  let penerimaNama = null, penerimaAlamat = null;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].match(/No\.?\s*Resi/i) && i + 1 < lines.length) {
+      penerimaNama = lines[i + 1].replace(/\s+/g, ' ').trim();
+      let addr = [];
+      for (let j = i + 2; j < Math.min(i + 12, lines.length); j++) {
+        if (lines[j].match(/^628\d{8,}/) || lines[j].match(/^Berat/i) || lines[j].match(/^# Nama/i)) break;
+        addr.push(lines[j].replace(/\s+/g, ' ').trim());
       }
+      penerimaAlamat = addr.filter(Boolean).join(', ') || null;
+      break;
     }
-
-    // 4. Pengirim
-    const pengirimMatch = teks.match(/Pengirim[:\s]+([^\n\r]+)/i) ||
-                          teks.match(/Dari[:\s]+([^\n\r]+)/i);
-    const pengirim = pengirimMatch ? pengirimMatch[1].trim() : null;
-
-    // 5. Berat
-    // Pola: "Berat: 1.2 kg" atau "1200 gr"
-    const beratMatch = teks.match(/Berat[:\s]*([\d\.,]+)\s*(kg|gr|g)/i);
-    let berat = 0.1; // Default
-    if (beratMatch) {
-      const nilai = parseFloat(beratMatch[1].replace(',', '.'));
-      const satuan = beratMatch[2].toLowerCase();
-      berat = (satuan === 'kg') ? nilai : nilai / 1000;
-    }
-
-    // 6. Parsing Item / Rincian Produk
-    // Mencari teks di antara "Rincian Pesanan" atau "Nama Produk" sampai batas bawah (misal "Total", "Catatan")
-    const items = [];
-    const itemSectionMatch = teks.match(/Rincian\s*Pesanan([\s\S]*?)(Total|Catatan|Kurir|Shopee|Pembayaran)/i) ||
-                             teks.match(/Nama\s*Produk([\s\S]*?)(Total|Catatan|Kurir)/i);
-
-    if (itemSectionMatch) {
-      const sectionText = itemSectionMatch[1];
-      const lines = sectionText.split('\n').map(l => l.trim()).filter(Boolean);
-
-      // Algoritma parsing item sederhana
-      // Biasanya format item: [Nama Produk] [Variasi] [Qty]
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        // Cek jika baris mengandung Qty (biasanya didahului "x" atau angka di ujung)
-        const qtyMatch = line.match(/x\s*(\d+)/i) || line.match(/[\s]+(\d+)$/);
-        if (qtyMatch) {
-          const qty = parseInt(qtyMatch[1], 10);
-          let nama_produk = line.replace(qtyMatch[0], '').trim();
-          let variasi = null;
-
-          // Cek baris berikutnya apakah merupakan variasi produk
-          if (i + 1 < lines.length && !lines[i + 1].match(/x\s*(\d+)/i)) {
-            variasi = lines[i + 1].trim();
-            i++; // skip baris variasi
-          }
-
-          items.push({
-            nama_produk,
-            variasi,
-            qty
-          });
-        }
-      }
-    }
-
-    // Jika parsing item gagal, buat fallback item dummy agar transaksi tetap bisa dicatat
-    if (items.length === 0) {
-      items.push({
-        nama_produk: 'Produk Tanpa Nama (Gagal Parsing)',
-        variasi: '-',
-        qty: 1
-      });
-    }
-
-    return {
-      no_resi: noResiMatch ? noResiMatch[1].trim() : 'UNKNOWN_RESI_' + Date.now(),
-      no_pesanan: noPesananMatch ? noPesananMatch[1].trim() : 'UNKNOWN_PESANAN_' + Date.now(),
-      penerima_nama: penerimaNama || 'Pelanggan Shopee',
-      penerima_alamat: penerimaAlamat || 'Alamat tidak terdeteksi',
-      pengirim: pengirim || 'Toko Shopee',
-      berat: berat,
-      tanggal_pesan: new Date(), // default tanggal hari ini
-      items: items
-    };
-
-  } catch (error) {
-    console.error('Error parsing PDF:', error);
-    throw new Error('Gagal memproses file PDF: ' + error.message);
   }
+
+  const pengirim = (t.match(/Pengirim[:\s]*([^\n]+)/i) || [])[1]?.trim() || null;
+  const noPesanan = (t.match(/Pesan[:\s]*\(([A-Z0-9]+)\)/i) || [])[1] || null;
+
+  let berat = 0.1;
+  const bm = t.match(/(\d+[.,]?\d*)\s*(kg|gr|g)/i);
+  if (bm) {
+    const n = parseFloat(bm[1].replace(',', '.'));
+    berat = bm[2].toLowerCase() === 'kg' ? n : n / 1000;
+  }
+
+  let tanggalPesan = new Date();
+  const batas = t.match(/Batas\s*Kirim[:\s]*(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})/i);
+  if (batas) {
+    const p = batas[1].split(/[-\/]/);
+    if (p.length === 3) tanggalPesan = new Date(`${p[2]}-${p[1]}-${p[0]}`);
+  }
+
+  const items = [];
+  const idx = t.indexOf('# Nama Produk');
+  if (idx !== -1) {
+    const end = t.indexOf('Pesan:', idx);
+    const sec = t.substring(idx, end > -1 ? end : idx + 1500);
+    sec.split('\n').map(l => l.trim()).filter(Boolean).forEach(line => {
+      const qtyM = line.match(/(\d+)$/);
+      if (qtyM && line.match(/^\d+\s/)) {
+        const qty = parseInt(qtyM[1]);
+        let nama = line.replace(qtyM[0], '').replace(/^\d+\s+/, '').trim();
+        const w = nama.split(/\s+/);
+        nama = w.length > 6 ? w.slice(0, 6).join(' ') : nama;
+        items.push({ nama_produk: nama || 'Produk', variasi: null, qty });
+      }
+    });
+  }
+
+  return {
+    no_resi: noResi,
+    no_pesanan: noPesanan || 'SPX' + Date.now(),
+    penerima_nama: penerimaNama || 'Pelanggan',
+    penerima_alamat: penerimaAlamat || '-',
+    pengirim: pengirim || 'Toko',
+    berat,
+    tanggal_pesan: tanggalPesan,
+    items: items.length > 0 ? items : [{ nama_produk: 'Produk', variasi: null, qty: 1 }]
+  };
+}
+
+async function parseResiPDF(filePath) {
+  const dataBuffer = fs.readFileSync(filePath);
+  const pdfParser = new PDFParse({ data: dataBuffer });
+  const textResult = await pdfParser.getText();
+  const fullTeks = textResult.text;
+
+  const blocks = fullTeks.split(/--\s*\d+\s+of\s+\d+\s*--/);
+  let results = blocks.map(b => parseSingleResi(b)).filter(Boolean);
+
+  if (results.length === 0) {
+    const single = parseSingleResi(fullTeks);
+    if (single) results.push(single);
+  }
+
+  return results; // return array
 }
 
 module.exports = { parseResiPDF };

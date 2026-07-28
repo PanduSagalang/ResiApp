@@ -84,11 +84,8 @@ export const laporan = {
 
 // Nota endpoints
 export const nota = {
-  get: (resiId) => {
-    return api.get(`/nota/${resiId}`, {
-      responseType: 'blob'
-    });
-  }
+  get: (resiId) => api.get(`/nota/resi/${resiId}`),
+  bulanan: (tokoId, params) => api.get(`/nota/toko/${tokoId}/bulanan`, { params }),
 };
 
 export default api;

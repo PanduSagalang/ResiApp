@@ -86,15 +86,8 @@ router.post('/:tokoId', upload.single('file'), async (req, res) => {
     try {
       // Parse berdasarkan tipe file
       if (fileExt === '.pdf') {
-        // Single PDF
-        const parsed = await parseResiPDF(req.file.path);
-        parseResults = [
-          {
-            file: fileName,
-            data: parsed,
-            status: 'success'
-          }
-        ];
+        const parsedArray = await parseResiPDF(req.file.path);
+        parseResults = parsedArray.map(r => ({ file: fileName, data: r, status: 'success' }));
       } else if (fileExt === '.zip') {
         // Multiple PDF dari ZIP
         const zipResult = await extractAndParseZip(req.file.path);
