@@ -5,9 +5,9 @@ function LaporanKeuangan({ toko }) {
   const [data, setData] = useState([]);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(false);
-  const today = new Date().toISOString().split('T')[0];
-  const [tglMulai, setTglMulai] = useState(today);
-  const [tglSelesai, setTglSelesai] = useState(today);
+  const start7 = new Date(); start7.setDate(start7.getDate() - 7);
+  const [tglMulai, setTglMulai] = useState(start7.toISOString().split('T')[0]);
+  const [tglSelesai, setTglSelesai] = useState(new Date().toISOString().split('T')[0]);
 
   useEffect(() => {
     if (tglMulai && tglSelesai) fetchLaporan();

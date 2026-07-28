@@ -4,200 +4,268 @@ import { produk as produkAPI } from '../services/api';
 function MasterProduk({ toko }) {
   const [produks, setProduks] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [editId, setEditId] = useState(null);
   const [search, setSearch] = useState('');
-  const [form, setForm] = useState({
-    nama_produk: '', variasi: '', harga_beli: '', harga_jual: '', admin_persen: '', ppn_persen: '',
-  });
-  const [error, setError] = useState('');
+  const [groupBy, setGroupBy] = useState(null); // { nama: string, variants: [] }
+  const [modal, setModal] = useState(null); // { variant?, bulk? }
 
   useEffect(() => { fetchProduks(); }, [toko.id]);
 
   const fetchProduks = async () => {
-    try {
-      setLoading(true);
+    try { setLoading(true);
       const res = await produkAPI.getAll(toko.id, search);
       setProduks(res.data.data || []);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   };
 
-  const resetForm = () => {
-    setForm({ nama_produk: '', variasi: '', harga_beli: '', harga_jual: '', admin_persen: '', ppn_persen: '' });
-    setEditId(null);
-    setShowForm(false);
-    setError('');
-  };
-
-  const handleEdit = (p) => {
-    setForm({
-      nama_produk: p.nama_produk, variasi: p.variasi || '',
-      harga_beli: p.harga_beli, harga_jual: p.harga_jual,
-      admin_persen: p.admin_persen, ppn_persen: p.ppn_persen,
-    });
-    setEditId(p.id);
-    setShowForm(true);
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!form.nama_produk.trim()) { setError('Nama produk wajib diisi'); return; }
-    try {
-      if (editId) await produkAPI.update(editId, form);
-      else await produkAPI.create(toko.id, form);
-      resetForm();
-      fetchProduks();
-    } catch (err) { setError(err.response?.data?.message || 'Gagal menyimpan'); }
-  };
-
-  const handleDelete = async (id) => {
-    if (!window.confirm('Yakin hapus produk ini?')) return;
-    try {
-      await produkAPI.delete(id);
-      setProduks(produks.filter(p => p.id !== id));
-    } catch (err) { alert('Gagal hapus'); }
-  };
+  // Group by nama_produk
+  const groups = {};
+  produks.forEach(p => {
+    if (!groups[p.nama_produk]) groups[p.nama_produk] = [];
+    groups[p.nama_produk].push(p);
+  });
 
   const fmt = (n) => new Intl.NumberFormat('id-ID').format(n || 0);
 
-  if (loading) {
-    return (
-      <div className="flex justify-center py-20">
-        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
-      </div>
-    );
-  }
+  const handleSearch = (e) => { e.preventDefault(); fetchProduks(); };
+
+  const openEdit = (p) => setModal({ variant: p });
+  const openBulk = (nama) => setModal({ bulk: true, parent: nama });
+  const closeModal = () => { setModal(null); fetchProduks(); };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Yakin hapus?')) return;
+    try { await produkAPI.delete(id); fetchProduks(); }
+    catch (err) { alert('Gagal hapus'); }
+  };
+
+  if (loading) return (
+    <div className="flex justify-center py-20">
+      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
+    </div>
+  );
 
   return (
     <div>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <h1 className="text-xl font-semibold text-gray-900">Master Produk</h1>
-        <button
-          onClick={() => { resetForm(); setShowForm(true); }}
-          className="self-start sm:self-auto bg-gray-900 text-white px-4 py-2 rounded-md hover:bg-gray-800 text-sm font-medium transition-colors"
-        >
+        <button onClick={() => setModal({ bulk: true, parent: '' })}
+          className="bg-gray-900 text-white px-4 py-2 rounded-md hover:bg-gray-800 text-sm font-medium">
           + Tambah Produk
         </button>
       </div>
 
-      <form onSubmit={(e) => { e.preventDefault(); fetchProduks(); }} className="mb-6">
+      <form onSubmit={handleSearch} className="mb-6">
         <div className="flex space-x-2">
-          <input
-            type="text"
-            placeholder="Cari produk..."
-            value={search}
+          <input type="text" placeholder="Cari produk..." value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-          />
-          <button type="submit" className="px-4 py-2 bg-gray-900 text-white rounded-md hover:bg-gray-800 text-sm font-medium">
-            Cari
-          </button>
+            className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+          <button type="submit" className="px-4 py-2 bg-gray-900 text-white rounded-md hover:bg-gray-800 text-sm font-medium">Cari</button>
         </div>
       </form>
 
-      {showForm && (
-        <div className="bg-white border border-gray-200 rounded-lg p-5 mb-6">
-          <h2 className="text-sm font-semibold text-gray-900 mb-4">{editId ? 'Edit Produk' : 'Tambah Produk Baru'}</h2>
-          {error && <div className="mb-3 p-2 bg-red-50 text-red-600 text-sm rounded-md border border-red-100">{error}</div>}
-          <form onSubmit={handleSubmit}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              {[
-                { label: 'Nama Produk *', key: 'nama_produk', type: 'text', required: true },
-                { label: 'Variasi', key: 'variasi', type: 'text' },
-                { label: 'Harga Beli (HPP)', key: 'harga_beli', type: 'number' },
-                { label: 'Harga Jual', key: 'harga_jual', type: 'number' },
-                { label: 'Admin (%)', key: 'admin_persen', type: 'number', step: '0.01' },
-                { label: 'PPN (%)', key: 'ppn_persen', type: 'number', step: '0.01' },
-              ].map(f => (
-                <div key={f.key}>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">{f.label}</label>
-                  <input
-                    type={f.type} step={f.step}
-                    value={form[f.key]}
-                    onChange={(e) => setForm({...form, [f.key]: e.target.value})}
-                    required={f.required}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-                  />
-                </div>
-              ))}
-            </div>
-            <div className="flex space-x-3">
-              <button type="submit" className="px-4 py-2 bg-gray-900 text-white rounded-md hover:bg-gray-800 text-sm font-medium">
-                {editId ? 'Update' : 'Simpan'}
-              </button>
-              <button type="button" onClick={resetForm} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm font-medium">
-                Batal
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {produks.length === 0 ? (
+      {Object.keys(groups).length === 0 ? (
         <div className="bg-white border border-gray-200 rounded-lg p-12 text-center">
           <p className="text-sm text-gray-500">Belum ada produk master.</p>
         </div>
       ) : (
-        <>
-          <div className="sm:hidden space-y-3">
-            {produks.map(p => (
-              <div key={p.id} className="bg-white border border-gray-200 rounded-lg p-4">
-                <div className="flex justify-between items-start mb-2">
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">{p.nama_produk}</p>
-                    <p className="text-xs text-gray-400">{p.variasi || '-'}</p>
-                  </div>
-                  <div className="text-right text-sm">
-                    <p className="text-gray-900 font-medium">Rp {fmt(p.harga_jual)}</p>
-                    <p className="text-gray-400 text-xs">HPP: Rp {fmt(p.harga_beli)}</p>
-                  </div>
-                </div>
-                <div className="flex text-xs text-gray-400 space-x-4 mb-3">
-                  <span>Admin: {p.admin_persen}%</span>
-                  <span>PPN: {p.ppn_persen}%</span>
-                </div>
-                <div className="flex space-x-2 pt-2 border-t border-gray-100">
-                  <button onClick={() => handleEdit(p)} className="text-xs px-3 py-1.5 border border-gray-200 text-gray-700 rounded-md hover:bg-gray-50">Edit</button>
-                  <button onClick={() => handleDelete(p.id)} className="text-xs px-3 py-1.5 border border-red-200 text-red-700 rounded-md hover:bg-red-50">Hapus</button>
-                </div>
+        <div className="space-y-4">
+          {Object.entries(groups).sort((a,b) => a[0].localeCompare(b[0])).map(([nama, variants]) => (
+            <div key={nama} className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+              <div className="flex justify-between items-center px-4 py-3 bg-gray-50 border-b border-gray-200">
+                <h3 className="font-semibold text-sm text-gray-900">{nama}</h3>
+                <button onClick={() => openBulk(nama)}
+                  className="text-xs px-3 py-1.5 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-100">
+                  + Variasi
+                </button>
               </div>
-            ))}
-          </div>
-
-          <div className="hidden sm:block bg-white border border-gray-200 rounded-lg overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
+              <table className="min-w-full divide-y divide-gray-100 text-sm">
                 <thead>
-                  <tr className="bg-gray-50">
-                    {['Nama Produk', 'Variasi', 'Harga Beli', 'Harga Jual', 'Admin %', 'PPN %', ''].map(h => (
-                      <th key={h} className={`px-4 py-3 ${h === '' ? '' : 'text-left'} text-xs font-medium text-gray-500 uppercase tracking-wider`}>{h === '' ? 'Aksi' : h}</th>
-                    ))}
+                  <tr className="text-xs text-gray-500">
+                    <th className="px-4 py-2 text-left">Variasi / Amper</th>
+                    <th className="px-4 py-2 text-right">Harga Beli</th>
+                    <th className="px-4 py-2 text-right">Harga Jual</th>
+                    <th className="px-4 py-2 text-right">Admin %</th>
+                    <th className="px-4 py-2 text-right">PPN %</th>
+                    <th className="px-4 py-2 text-right">Aksi</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {produks.map(p => (
-                    <tr key={p.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-3 text-sm font-medium text-gray-900">{p.nama_produk}</td>
-                      <td className="px-4 py-3 text-sm text-gray-500">{p.variasi || '-'}</td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-600">Rp {fmt(p.harga_beli)}</td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-900 font-medium">Rp {fmt(p.harga_jual)}</td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-600">{p.admin_persen}%</td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-600">{p.ppn_persen}%</td>
-                      <td className="px-4 py-3 text-sm">
-                        <div className="flex space-x-3">
-                          <button onClick={() => handleEdit(p)} className="text-gray-600 hover:text-gray-900">Edit</button>
-                          <button onClick={() => handleDelete(p.id)} className="text-red-600 hover:text-red-800">Hapus</button>
-                        </div>
+                <tbody className="divide-y divide-gray-100">
+                  {variants.sort((a,b) => (a.variasi||'').localeCompare(b.variasi||'')).map(v => (
+                    <tr key={v.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-2 font-mono text-gray-900">{v.variasi || '-'}</td>
+                      <td className="px-4 py-2 text-right text-gray-600">Rp {fmt(v.harga_beli)}</td>
+                      <td className="px-4 py-2 text-right text-gray-900 font-medium">Rp {fmt(v.harga_jual)}</td>
+                      <td className="px-4 py-2 text-right text-gray-600">{v.admin_persen}%</td>
+                      <td className="px-4 py-2 text-right text-gray-600">{v.ppn_persen}%</td>
+                      <td className="px-4 py-2 text-right">
+                        <button onClick={() => openEdit(v)} className="text-gray-600 hover:text-gray-900 text-xs mr-3">Edit</button>
+                        <button onClick={() => handleDelete(v.id)} className="text-red-600 hover:text-red-800 text-xs">Hapus</button>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          </div>
-        </>
+          ))}
+        </div>
       )}
+
+      {/* Modal Edit Variant */}
+      {modal?.variant && <ProdukModal
+        produk={modal.variant} tokoId={toko.id}
+        onClose={closeModal} />
+      }
+
+      {/* Modal Bulk Add */}
+      {modal?.bulk && <BulkForm
+        parent={modal.parent || ''} tokoId={toko.id}
+        onClose={closeModal} />
+      }
+    </div>
+  );
+}
+
+function ProdukModal({ produk, tokoId, onClose }) {
+  const [form, setForm] = useState({
+    nama_produk: produk.nama_produk, variasi: produk.variasi || '',
+    harga_beli: produk.harga_beli, harga_jual: produk.harga_jual,
+    admin_persen: produk.admin_persen, ppn_persen: produk.ppn_persen,
+  });
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!form.nama_produk.trim()) { setError('Nama produk wajib'); return; }
+    try {
+      await produkAPI.update(produk.id, form);
+      onClose();
+    } catch (err) { setError(err.response?.data?.message || 'Gagal'); }
+  };
+
+  const handleDelete = async () => {
+    if (!window.confirm('Yakin hapus?')) return;
+    try { await produkAPI.delete(produk.id); onClose(); }
+    catch (err) { alert('Gagal hapus'); }
+  };
+
+  return (
+    <Overlay onClose={onClose} onSubmit={handleSubmit} title="Edit Produk" error={error} form={form} setForm={setForm}
+      isNew={false} onDelete={handleDelete} />
+  );
+}
+
+function BulkForm({ parent, tokoId, onClose }) {
+  const [form, setForm] = useState({
+    nama_produk: parent, variasi: '', harga_beli: '', harga_jual: '',
+    admin_persen: '', ppn_persen: '',
+  });
+  const [bulk, setBulk] = useState(''); // multiline: 2A=36500/51000
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setError('');
+    try {
+      const items = [];
+      if (form.nama_produk.trim() && form.variasi.trim() && form.harga_beli !== '') {
+        items.push({
+          nama_produk: form.nama_produk.trim(), variasi: form.variasi.trim(),
+          harga_beli: parseFloat(form.harga_beli) || 0, harga_jual: parseFloat(form.harga_jual) || 0,
+          admin_persen: parseFloat(form.admin_persen) || 0, ppn_persen: parseFloat(form.ppn_persen) || 0,
+        });
+      }
+      if (bulk.trim()) {
+        bulk.split('\n').map(l => l.trim()).filter(Boolean).forEach(line => {
+          const parts = line.split(/[=|\/]/);
+          if (parts.length >= 2) {
+            const variasi = parts[0].trim();
+            const prices = parts[1].split('/');
+            items.push({
+              nama_produk: form.nama_produk.trim(), variasi,
+              harga_beli: parseFloat(prices[0]) || 0, harga_jual: parseFloat(prices[1]) || parseFloat(prices[0]) || 0,
+              admin_persen: parseFloat(form.admin_persen) || 0, ppn_persen: parseFloat(form.ppn_persen) || 0,
+            });
+          }
+        });
+      }
+      if (items.length === 0) { setError('Isi minimal 1 variasi'); setSaving(false); return; }
+      for (const item of items) {
+        await produkAPI.create(tokoId, item);
+      }
+      onClose();
+    } catch (err) { setError(err.response?.data?.message || 'Gagal simpan'); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <Overlay onClose={onClose} onSubmit={handleSubmit} title="Tambah Produk / Variasi" error={error}
+      form={form} setForm={setForm} isNew={true} bulk={bulk} setBulk={setBulk} saving={saving} />
+  );
+}
+
+function Overlay({ onClose, onSubmit, title, error, form, setForm, isNew, onDelete, bulk, setBulk, saving }) {
+  const fields = [
+    { label: 'Nama Produk *', key: 'nama_produk', type: 'text' },
+    { label: 'Variasi (Amper)', key: 'variasi', type: 'text' },
+    { label: 'Harga Beli (HPP)', key: 'harga_beli', type: 'number' },
+    { label: 'Harga Jual', key: 'harga_jual', type: 'number' },
+    { label: 'Admin %', key: 'admin_persen', type: 'number', step: '0.01' },
+    { label: 'PPN %', key: 'ppn_persen', type: 'number', step: '0.01' },
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div className="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4" onClick={(e) => e.stopPropagation()}>
+        <div className="border-b border-gray-200 p-4 flex justify-between items-center">
+          <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl leading-none">&times;</button>
+        </div>
+        <form onSubmit={onSubmit}>
+          <div className="p-4 space-y-3">
+            {error && <div className="p-2 bg-red-50 text-red-600 text-sm rounded border border-red-100">{error}</div>}
+            <div className="grid grid-cols-2 gap-3">
+              {fields.map(f => (
+                <div key={f.key} className={f.key === 'nama_produk' ? 'col-span-2' : ''}>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">{f.label}</label>
+                  <input type={f.type} step={f.step} value={form[f.key]}
+                    onChange={(e) => setForm({...form, [f.key]: e.target.value})}
+                    required={f.key === 'nama_produk'}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
+                </div>
+              ))}
+            </div>
+            {setBulk && (
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Bulk Variasi (satu per baris: <code>2A=36500/51000</code>)
+                </label>
+                <textarea value={bulk} onChange={(e) => setBulk(e.target.value)}
+                  placeholder="2A=36500/51000&#10;4A=36500/51000&#10;6A=36500/51000"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 font-mono h-24" />
+              </div>
+            )}
+          </div>
+          <div className="border-t border-gray-200 p-4 flex justify-between">
+            <div>
+              {onDelete && (
+                <button type="button" onClick={onDelete}
+                  className="text-red-600 hover:text-red-800 text-sm">Hapus</button>
+              )}
+            </div>
+            <div className="flex space-x-3">
+              <button type="button" onClick={onClose}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm font-medium">Batal</button>
+              <button type="submit" disabled={saving}
+                className="px-4 py-2 bg-gray-900 text-white rounded-md hover:bg-gray-800 text-sm font-medium disabled:opacity-50">
+                {saving ? 'Menyimpan...' : 'Simpan'}
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

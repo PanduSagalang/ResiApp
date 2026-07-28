@@ -6,9 +6,9 @@ function DashboardResi({ toko }) {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
-  const today = new Date().toISOString().split('T')[0];
-  const [tglMulai, setTglMulai] = useState(today);
-  const [tglSelesai, setTglSelesai] = useState(today);
+  const start7 = new Date(); start7.setDate(start7.getDate() - 7);
+  const [tglMulai, setTglMulai] = useState(start7.toISOString().split('T')[0]);
+  const [tglSelesai, setTglSelesai] = useState(new Date().toISOString().split('T')[0]);
   const [detail, setDetail] = useState(null);
 
   useEffect(() => { fetchResis(); }, [toko.id]);
