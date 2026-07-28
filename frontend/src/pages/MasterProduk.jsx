@@ -47,26 +47,36 @@ function MasterProduk({ toko }) {
   );
 
   return (
-    <div>
+    <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <h1 className="text-xl font-bold text-gray-800">Master Produk</h1>
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 bg-indigo-100 rounded-xl flex items-center justify-center shadow-sm border border-indigo-200">
+            <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+            </svg>
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-gray-900 tracking-tight">Master Produk</h1>
+            <p className="text-xs text-gray-500 font-medium mt-0.5">Kelola harga, variasi, dan data produk utama</p>
+          </div>
+        </div>
         <button onClick={() => setModal({ bulk: true, parent: '' })}
-          className="inline-flex items-center justify-center px-4 py-2 rounded-lg text-sm font-medium transition-all duration-150 shadow-sm bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800">
+          className="inline-flex items-center justify-center px-4 py-2 rounded-xl text-sm font-bold transition-all duration-150 shadow-md bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800 hover:-translate-y-0.5">
           + Tambah Produk
         </button>
       </div>
 
-      <form onSubmit={handleSearch} className="bg-white/80 backdrop-blur-sm border border-gray-200 rounded-xl p-4 mb-6 shadow-sm">
+      <form onSubmit={handleSearch} className="bg-white/90 backdrop-blur-md border border-gray-100 rounded-2xl p-4 sm:p-5 mb-6 shadow-xl">
         <div className="flex gap-2">
           <input type="text" placeholder="Cari produk..." value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" />
-          <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 active:bg-indigo-800 text-sm font-medium shadow-sm transition-all">Cari</button>
+            className="flex-1 px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm" />
+          <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 active:bg-indigo-800 text-sm font-semibold shadow-md transition-all">Cari</button>
         </div>
       </form>
 
       {Object.keys(groups).length === 0 ? (
-        <div className="bg-white border border-gray-200 rounded-lg p-12 text-center">
+        <div className="bg-white/90 backdrop-blur-md border border-gray-100 rounded-2xl p-12 text-center shadow-xl">
           <p className="text-sm text-gray-500">Belum ada produk master.</p>
         </div>
       ) : (
