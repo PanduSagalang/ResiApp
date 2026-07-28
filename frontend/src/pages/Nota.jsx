@@ -5,22 +5,61 @@ function Nota({ toko }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const now = new Date();
-  const [tahun, setTahun] = useState(now.getFullYear());
-  const [bulan, setBulan] = useState(now.getMonth() + 1);
+  const today = now.toISOString().split('T')[0];
 
-  useEffect(() => { fetchNota(); }, [tahun, bulan, toko.id]);
+  // Filter defaults: minggu ini
+  const startWeek = new Date(now);
+  startWeek.setDate(now.getDate() - now.getDay());
+  const endWeek = new Date(startWeek);
+  endWeek.setDate(startWeek.getDate() + 6);
+
+  const [tglMulai, setTglMulai] = useState(startWeek.toISOString().split('T')[0]);
+  const [tglSelesai, setTglSelesai] = useState(endWeek.toISOString().split('T')[0]);
+  const [filterLabel, setFilterLabel] = useState('Minggu Ini');
+
+  useEffect(() => { fetchNota(); }, [tglMulai, tglSelesai, toko.id]);
 
   const fetchNota = async () => {
     try {
       setLoading(true);
-      const res = await notaAPI.bulanan(toko.id, { tahun, bulan });
+      const res = await notaAPI.bulanan(toko.id, { tgl_mulai: tglMulai, tgl_selesai: tglSelesai });
       setData(res.data.data);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   };
 
-  const fmt = (n) => new Intl.NumberFormat('id-ID').format(n || 0);
+  const setRange = (label, mulai, selesai) => {
+    setFilterLabel(label);
+    setTglMulai(mulai);
+    setTglSelesai(selesai);
+  };
 
+  const presets = [
+    { label: 'Hari Ini', fn: () => setRange('Hari Ini', today, today) },
+    {
+      label: 'Minggu Ini',
+      fn: () => {
+        const s = new Date(); s.setDate(s.getDate() - s.getDay());
+        const e = new Date(s); e.setDate(s.getDate() + 6);
+        setRange('Minggu Ini', s.toISOString().split('T')[0], e.toISOString().split('T')[0]);
+      }
+    },
+    {
+      label: 'Minggu Lalu',
+      fn: () => {
+        const s = new Date(); s.setDate(s.getDate() - s.getDay() - 7);
+        const e = new Date(s); e.setDate(s.getDate() + 6);
+        setRange('Minggu Lalu', s.toISOString().split('T')[0], e.toISOString().split('T')[0]);
+      }
+    },
+    { label: 'Bulan Ini', fn: () => {
+      const n = new Date();
+      const y = n.getFullYear(), m = String(n.getMonth() + 1).padStart(2, '0');
+      setRange('Bulan Ini', `${y}-${m}-01`, `${y}-${m}-${new Date(y, n.getMonth() + 1, 0).getDate()}`);
+    }},
+  ];
+
+  const fmt = (n) => new Intl.NumberFormat('id-ID').format(n || 0);
   const bulanNama = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 
   if (loading) return (
@@ -32,20 +71,28 @@ function Nota({ toko }) {
   return (
     <div>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <h1 className="text-xl font-semibold text-gray-900">Nota Bulanan</h1>
-        <div className="flex gap-2">
-          <select value={bulan} onChange={(e) => setBulan(parseInt(e.target.value))}
-            className="px-3 py-2 border border-gray-300 rounded-md text-sm">
-            {bulanNama.map((n, i) => <option key={i} value={i + 1}>{n}</option>)}
-          </select>
-          <input type="number" value={tahun} onChange={(e) => setTahun(parseInt(e.target.value))}
-            className="px-3 py-2 border border-gray-300 rounded-md text-sm w-24" />
+        <h1 className="text-xl font-semibold text-gray-900">Nota</h1>
+        <div className="flex items-center gap-2">
+          <input type="date" value={tglMulai} onChange={(e) => setRange('Filter', e.target.value, tglSelesai)}
+            className="px-3 py-2 border border-gray-300 rounded-md text-sm" />
+          <span className="text-gray-400 text-sm">s/d</span>
+          <input type="date" value={tglSelesai} onChange={(e) => setRange('Filter', tglMulai, e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-md text-sm" />
         </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2 mb-6">
+        {presets.map(p => (
+          <button key={p.label} onClick={p.fn}
+            className={`text-xs px-3 py-1.5 rounded-md transition-colors ${
+              filterLabel === p.label ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}>{p.label}</button>
+        ))}
       </div>
 
       {!data || data.total_resi === 0 ? (
         <div className="bg-white border border-gray-200 rounded-lg p-12 text-center">
-          <p className="text-sm text-gray-500">Tidak ada data untuk periode ini.</p>
+          <p className="text-sm text-gray-500">Tidak ada data untuk periode {filterLabel}.</p>
         </div>
       ) : (
         <div className="space-y-6">
@@ -58,7 +105,7 @@ function Nota({ toko }) {
               </div>
               <div className="text-right text-sm">
                 <p className="text-gray-500">Periode</p>
-                <p className="font-medium">{bulanNama[bulan - 1]} {tahun}</p>
+                <p className="font-medium">{data.periode}</p>
                 <p className="text-gray-400 text-xs mt-1">{data.total_resi} resi</p>
               </div>
             </div>
@@ -86,7 +133,7 @@ function Nota({ toko }) {
                       <td className="px-4 py-2 text-gray-400">{i + 1}</td>
                       <td className="px-4 py-2 font-medium text-gray-900">{item.nama_produk}</td>
                       <td className="px-4 py-2 text-gray-500">{item.variasi || '-'}</td>
-                      <td className="px-4 py-2 text-right">{item.qty}</td>
+                      <td className="px-4 py-2 text-right font-medium">{item.qty}</td>
                       <td className="px-4 py-2 text-right text-gray-600">Rp {fmt(item.harga_beli)}</td>
                       <td className="px-4 py-2 text-right text-gray-600">Rp {fmt(item.harga_jual)}</td>
                       <td className="px-4 py-2 text-right font-medium">Rp {fmt(item.subtotal_beli)}</td>

@@ -6,16 +6,25 @@ const { Op } = require('sequelize');
 /**
  * GET /api/nota/toko/:tokoId/bulanan?tahun=2026&bulan=7
  * Nota akumulasi bulanan per toko
+ * 
+ * Alternatif: ?tgl_mulai=2026-07-01&tgl_selesai=2026-07-31 untuk range bebas
  */
 router.get('/toko/:tokoId/bulanan', async (req, res) => {
   try {
     const { tokoId } = req.params;
-    const tahun = parseInt(req.query.tahun) || new Date().getFullYear();
-    const bulan = parseInt(req.query.bulan) || (new Date().getMonth() + 1);
+    const { tgl_mulai, tgl_selesai } = req.query;
+    let tahun, bulan, tglMulai, tglSelesai;
 
-    const tglMulai = `${tahun}-${String(bulan).padStart(2,'0')}-01`;
-    const lastDay = new Date(tahun, bulan, 0).getDate();
-    const tglSelesai = `${tahun}-${String(bulan).padStart(2,'0')}-${lastDay}`;
+    if (tgl_mulai && tgl_selesai) {
+      tglMulai = tgl_mulai;
+      tglSelesai = tgl_selesai;
+    } else {
+      tahun = parseInt(req.query.tahun) || new Date().getFullYear();
+      bulan = parseInt(req.query.bulan) || (new Date().getMonth() + 1);
+      tglMulai = `${tahun}-${String(bulan).padStart(2,'0')}-01`;
+      const lastDay = new Date(tahun, bulan, 0).getDate();
+      tglSelesai = `${tahun}-${String(bulan).padStart(2,'0')}-${lastDay}`;
+    }
 
     const toko = await db.Toko.findByPk(tokoId);
     if (!toko) return res.status(404).json({ success: false, message: 'Toko not found' });
