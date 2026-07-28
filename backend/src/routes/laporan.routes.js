@@ -85,4 +85,39 @@ router.get('/:tokoId/export', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/laporan/:tokoId/chart
+ * Aggregates daily data for the chart
+ */
+router.get('/:tokoId/chart', async (req, res) => {
+  try {
+    const { tgl_mulai, tgl_selesai } = req.query;
+    if (!tgl_mulai || !tgl_selesai) return res.status(400).json({ message: 'Missing dates' });
+    
+    const resis = await Resi.findAll({
+      where: {
+        toko_id: req.params.tokoId,
+        status: { [Op.ne]: 'dibatalkan' },
+        tanggal_pesan: { [Op.between]: [tgl_mulai, tgl_selesai] }
+      },
+      include: [{ model: Transaksi, as: 'transaksi' }]
+    });
+
+    const groups = {};
+    resis.forEach(r => {
+      const date = r.tanggal_pesan;
+      if (!groups[date]) groups[date] = { date, kotor: 0, bersih: 0 };
+      if (r.transaksi) {
+        groups[date].kotor += parseFloat(r.transaksi.penghasilan_kotor) || 0;
+        groups[date].bersih += parseFloat(r.transaksi.penghasilan_bersih) || 0;
+      }
+    });
+
+    const chartData = Object.values(groups).sort((a,b) => a.date.localeCompare(b.date));
+    res.json({ success: true, data: chartData });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 module.exports = router;

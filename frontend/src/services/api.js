@@ -77,6 +77,7 @@ export const resi = {
 // Laporan endpoints
 export const laporan = {
   getAll: (tokoId, params) => api.get(`/laporan/${tokoId}`, { params }),
+  getChart: (tokoId, params) => api.get(`/laporan/${tokoId}/chart`, { params }),
   exportCSV: (tokoId, params) => {
     return api.get(`/laporan/${tokoId}/export`, { 
       params,
