@@ -61,6 +61,7 @@ export const produk = {
   create: (tokoId, data) => api.post(`/produk/${tokoId}`, data),
   update: (id, data) => api.put(`/produk/${id}`, data),
   delete: (id) => api.delete(`/produk/${id}`),
+  bulkUpdate: (items) => api.post('/produk/bulk-update', { items }),
 };
 
 // Resi endpoints
@@ -69,6 +70,7 @@ export const resi = {
   update: (id, data) => api.put(`/resi/${id}`, data),
   delete: (id) => api.delete(`/resi/${id}`),
   retur: (id, data) => api.post(`/resi/${id}/retur`, data),
+  bulkDelete: (ids) => api.post('/resi/bulk-delete', { ids }),
 };
 
 // Laporan endpoints
@@ -86,6 +88,7 @@ export const laporan = {
 export const nota = {
   get: (resiId) => api.get(`/nota/resi/${resiId}`),
   bulanan: (tokoId, params) => api.get(`/nota/toko/${tokoId}/bulanan`, { params }),
+  exportExcel: (tokoId, params) => api.get(`/nota/toko/${tokoId}/export-excel`, { params, responseType: 'blob' }),
 };
 
 export default api;

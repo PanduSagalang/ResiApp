@@ -215,4 +215,38 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/produk/bulk-update
+ * Edit massal harga produk
+ * Body: { items: [{id:1, harga_beli:1000, harga_jual:2000}, ...] }
+ */
+router.post('/bulk-update', async (req, res) => {
+  try {
+    const { items } = req.body;
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ success: false, message: 'items array required' });
+    }
+    let updated = 0;
+    let tokoId = null;
+    for (const it of items) {
+      const p = await ProdukMaster.findByPk(it.id);
+      if (!p) continue;
+      tokoId = p.toko_id;
+      await p.update({
+        harga_beli: it.harga_beli !== undefined ? parseFloat(it.harga_beli) : p.harga_beli,
+        harga_jual: it.harga_jual !== undefined ? parseFloat(it.harga_jual) : p.harga_jual,
+        admin_persen: it.admin_persen !== undefined ? parseFloat(it.admin_persen) : p.admin_persen,
+        ppn_persen: it.ppn_persen !== undefined ? parseFloat(it.ppn_persen) : p.ppn_persen,
+      });
+      updated++;
+    }
+    if (tokoId) {
+      try { await recalculateTokoTransaksi(tokoId); } catch (e) {}
+    }
+    res.status(200).json({ success: true, message: `${updated} produk diupdate` });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 module.exports = router;

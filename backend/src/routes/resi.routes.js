@@ -84,6 +84,24 @@ router.delete('/:id', async (req, res) => {
 });
 
 /**
+ * POST /api/resi/bulk-delete
+ * Hapus banyak resi sekaligus
+ * Body: { ids: [1,2,3] }
+ */
+router.post('/bulk-delete', async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ success: false, message: 'ids array required' });
+    }
+    await Resi.destroy({ where: { id: { [Op.in]: ids } } });
+    return res.status(200).json({ success: true, message: `${ids.length} resi dihapus` });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
  * POST /api/resi/:id/retur
  * Tandai retur
  */

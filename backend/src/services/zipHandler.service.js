@@ -41,11 +41,14 @@ async function extractAndParseZip(zipFilePath) {
 
         // Parse PDF
         const parsed = await parseResiPDF(filePath);
-        results.push({
-          file: fileName,
-          data: parsed,
-          status: 'success'
-        });
+        // parsed is array (multi-resi support) — flatten
+        for (const resiData of parsed) {
+          results.push({
+            file: fileName,
+            data: resiData,
+            status: 'success'
+          });
+        }
 
         // Cleanup individual PDF setelah parsing
         fs.unlinkSync(filePath);
@@ -61,7 +64,7 @@ async function extractAndParseZip(zipFilePath) {
 
     // Cleanup temp directory
     if (fs.existsSync(tempDir)) {
-      fs.rmdirSync(tempDir, { recursive: true });
+      fs.rmSync(tempDir, { recursive: true, force: true });
     }
 
     return {

@@ -31,6 +31,7 @@ function MasterProduk({ toko }) {
 
   const openEdit = (p) => setModal({ variant: p });
   const openBulk = (nama) => setModal({ bulk: true, parent: nama });
+  const openBulkEdit = (nama, variants) => setModal({ bulkEdit: true, parent: nama, variants });
   const closeModal = () => { setModal(null); fetchProduks(); };
 
   const handleDelete = async (id) => {
@@ -48,19 +49,19 @@ function MasterProduk({ toko }) {
   return (
     <div>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <h1 className="text-xl font-semibold text-gray-900">Master Produk</h1>
+        <h1 className="text-xl font-bold text-gray-800">Master Produk</h1>
         <button onClick={() => setModal({ bulk: true, parent: '' })}
-          className="bg-gray-900 text-white px-4 py-2 rounded-md hover:bg-gray-800 text-sm font-medium">
+          className="inline-flex items-center justify-center px-4 py-2 rounded-lg text-sm font-medium transition-all duration-150 shadow-sm bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800">
           + Tambah Produk
         </button>
       </div>
 
-      <form onSubmit={handleSearch} className="mb-6">
-        <div className="flex space-x-2">
+      <form onSubmit={handleSearch} className="bg-white/80 backdrop-blur-sm border border-gray-200 rounded-xl p-4 mb-6 shadow-sm">
+        <div className="flex gap-2">
           <input type="text" placeholder="Cari produk..." value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-900" />
-          <button type="submit" className="px-4 py-2 bg-gray-900 text-white rounded-md hover:bg-gray-800 text-sm font-medium">Cari</button>
+            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" />
+          <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 active:bg-indigo-800 text-sm font-medium shadow-sm transition-all">Cari</button>
         </div>
       </form>
 
@@ -72,12 +73,18 @@ function MasterProduk({ toko }) {
         <div className="space-y-4">
           {Object.entries(groups).sort((a,b) => a[0].localeCompare(b[0])).map(([nama, variants]) => (
             <div key={nama} className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-              <div className="flex justify-between items-center px-4 py-3 bg-gray-50 border-b border-gray-200">
-                <h3 className="font-semibold text-sm text-gray-900">{nama}</h3>
-                <button onClick={() => openBulk(nama)}
-                  className="text-xs px-3 py-1.5 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-100">
-                  + Variasi
-                </button>
+              <div className="flex justify-between items-center px-4 py-3 bg-gradient-to-r from-indigo-50 to-blue-50 border-b border-gray-200">
+                <h3 className="font-semibold text-sm text-gray-800">{nama}</h3>
+                <div className="space-x-2">
+                  <button onClick={() => openBulkEdit(nama, variants)}
+                    className="text-xs px-3 py-1.5 border border-indigo-200 text-indigo-700 bg-white rounded-lg hover:bg-indigo-50 font-medium transition-all shadow-sm">
+                    Edit Massal
+                  </button>
+                  <button onClick={() => openBulk(nama)}
+                    className="text-xs px-3 py-1.5 border border-gray-200 text-gray-700 bg-white rounded-lg hover:bg-gray-50 font-medium transition-all shadow-sm">
+                    + Variasi
+                  </button>
+                </div>
               </div>
               <table className="min-w-full divide-y divide-gray-100 text-sm">
                 <thead>
@@ -99,8 +106,8 @@ function MasterProduk({ toko }) {
                       <td className="px-4 py-2 text-right text-gray-600">{v.admin_persen}%</td>
                       <td className="px-4 py-2 text-right text-gray-600">{v.ppn_persen}%</td>
                       <td className="px-4 py-2 text-right">
-                        <button onClick={() => openEdit(v)} className="text-gray-600 hover:text-gray-900 text-xs mr-3">Edit</button>
-                        <button onClick={() => handleDelete(v.id)} className="text-red-600 hover:text-red-800 text-xs">Hapus</button>
+                        <button onClick={() => openEdit(v)} className="text-indigo-600 hover:text-indigo-800 text-xs mr-3 font-medium">Edit</button>
+                        <button onClick={() => handleDelete(v.id)} className="text-rose-600 hover:text-rose-800 text-xs font-medium">Hapus</button>
                       </td>
                     </tr>
                   ))}
@@ -120,6 +127,12 @@ function MasterProduk({ toko }) {
       {/* Modal Bulk Add */}
       {modal?.bulk && <BulkForm
         parent={modal.parent || ''} tokoId={toko.id}
+        onClose={closeModal} />
+      }
+
+      {/* Modal Bulk Edit */}
+      {modal?.bulkEdit && <BulkEditForm
+        parent={modal.parent} variants={modal.variants} tokoId={toko.id}
         onClose={closeModal} />
       }
     </div>
@@ -206,6 +219,86 @@ function BulkForm({ parent, tokoId, onClose }) {
   );
 }
 
+function BulkEditForm({ parent, variants, tokoId, onClose }) {
+  const [items, setItems] = useState(variants.map(v => ({
+    id: v.id, variasi: v.variasi,
+    harga_beli: v.harga_beli, harga_jual: v.harga_jual,
+    admin_persen: v.admin_persen, ppn_persen: v.ppn_persen
+  })));
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const handleChange = (id, field, val) => {
+    setItems(items.map(it => it.id === id ? { ...it, [field]: val } : it));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await produkAPI.bulkUpdate(items);
+      onClose();
+    } catch (err) { setError('Gagal edit massal'); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="border-b border-gray-200 p-4 flex justify-between items-center">
+          <h2 className="text-lg font-semibold text-gray-900">Edit Massal: {parent}</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl leading-none">&times;</button>
+        </div>
+        <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0">
+          <div className="p-4 overflow-y-auto flex-1 space-y-3">
+            {error && <div className="p-2 bg-red-50 text-red-600 text-sm rounded border border-red-100">{error}</div>}
+            <table className="min-w-full divide-y divide-gray-200 text-sm">
+              <thead>
+                <tr className="bg-gray-50 text-xs text-gray-500">
+                  <th className="px-3 py-2 text-left">Variasi</th>
+                  <th className="px-3 py-2 text-left">Harga Beli</th>
+                  <th className="px-3 py-2 text-left">Harga Jual</th>
+                  <th className="px-3 py-2 text-left">Admin %</th>
+                  <th className="px-3 py-2 text-left">PPN %</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {items.map(it => (
+                  <tr key={it.id}>
+                    <td className="px-3 py-2 font-mono">{it.variasi || '-'}</td>
+                    <td className="px-3 py-2">
+                      <input type="number" value={it.harga_beli} onChange={(e) => handleChange(it.id, 'harga_beli', e.target.value)}
+                        className="w-24 px-2 py-1 border border-gray-300 rounded text-sm" />
+                    </td>
+                    <td className="px-3 py-2">
+                      <input type="number" value={it.harga_jual} onChange={(e) => handleChange(it.id, 'harga_jual', e.target.value)}
+                        className="w-24 px-2 py-1 border border-gray-300 rounded text-sm" />
+                    </td>
+                    <td className="px-3 py-2">
+                      <input type="number" step="0.01" value={it.admin_persen} onChange={(e) => handleChange(it.id, 'admin_persen', e.target.value)}
+                        className="w-16 px-2 py-1 border border-gray-300 rounded text-sm" />
+                    </td>
+                    <td className="px-3 py-2">
+                      <input type="number" step="0.01" value={it.ppn_persen} onChange={(e) => handleChange(it.id, 'ppn_persen', e.target.value)}
+                        className="w-16 px-2 py-1 border border-gray-300 rounded text-sm" />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="border-t border-gray-200 p-4 flex justify-end space-x-3">
+            <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium transition-all">Batal</button>
+            <button type="submit" disabled={saving} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 active:bg-indigo-800 text-sm font-medium shadow-sm disabled:opacity-50 transition-all">
+              {saving ? 'Menyimpan...' : 'Simpan Perubahan'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function Overlay({ onClose, onSubmit, title, error, form, setForm, isNew, onDelete, bulk, setBulk, saving }) {
   const fields = [
     { label: 'Nama Produk *', key: 'nama_produk', type: 'text' },
@@ -248,18 +341,18 @@ function Overlay({ onClose, onSubmit, title, error, form, setForm, isNew, onDele
               </div>
             )}
           </div>
-          <div className="border-t border-gray-200 p-4 flex justify-between">
+          <div className="flex justify-between w-full">
             <div>
               {onDelete && (
                 <button type="button" onClick={onDelete}
-                  className="text-red-600 hover:text-red-800 text-sm">Hapus</button>
+                  className="px-4 py-2 text-rose-600 hover:text-rose-800 text-sm font-medium hover:bg-rose-50 rounded-lg transition-all">Hapus</button>
               )}
             </div>
-            <div className="flex space-x-3">
+            <div className="flex gap-2">
               <button type="button" onClick={onClose}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm font-medium">Batal</button>
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium transition-all">Batal</button>
               <button type="submit" disabled={saving}
-                className="px-4 py-2 bg-gray-900 text-white rounded-md hover:bg-gray-800 text-sm font-medium disabled:opacity-50">
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 active:bg-indigo-800 text-sm font-medium shadow-sm disabled:opacity-50 transition-all">
                 {saving ? 'Menyimpan...' : 'Simpan'}
               </button>
             </div>
