@@ -46,16 +46,18 @@ router.get('/:tokoId', async (req, res) => {
   try {
     const data = await getLaporanData(req.params.tokoId, req.query);
     
-    // Aggregation
+    // Aggregation — only count active (retur/dibatalkan already 0'd by kalkulasi, but be safe)
     const summary = data.reduce((acc, curr) => {
-      acc.total_pesanan += 1;
-      acc.total_hpp += curr.hpp_total;
-      acc.total_jual += curr.harga_jual_total;
-      acc.total_admin += curr.admin_fee;
-      acc.total_ppn += curr.ppn;
+      if (curr.status === 'aktif') {
+        acc.total_pesanan += 1;
+        acc.total_hpp += curr.hpp_total;
+        acc.total_jual += curr.harga_jual_total;
+        acc.total_admin += curr.admin_fee;
+        acc.total_ppn += curr.ppn;
+        acc.total_kotor += curr.penghasilan_kotor;
+        acc.total_bersih += curr.penghasilan_bersih;
+      }
       acc.total_retur += curr.potongan_retur;
-      acc.total_kotor += curr.penghasilan_kotor;
-      acc.total_bersih += curr.penghasilan_bersih;
       return acc;
     }, {
       total_pesanan: 0, total_hpp: 0, total_jual: 0, total_admin: 0,

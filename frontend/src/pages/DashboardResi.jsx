@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { resi as resiAPI, nota as notaAPI } from '../services/api';
 import api from '../services/api';
 import { MoreHorizontal } from 'lucide-react';
@@ -16,6 +16,8 @@ function DashboardResi({ toko }) {
   const [detail, setDetail] = useState(null);
   const [selected, setSelected] = useState([]);
   const [openMenu, setOpenMenu] = useState(null);
+  const btnRefs = useRef({});
+  const [menuPos, setMenuPos] = useState({ top: 0, right: 0 });
 
   useEffect(() => { fetchResis(); }, [toko.id]);
 
@@ -134,10 +136,14 @@ function DashboardResi({ toko }) {
                       <td className="px-3 py-3"><span className={sc(r.status)}>{r.status}</span></td>
                       <td className="px-3 py-3">
                         <div className="relative">
-                          <button onClick={() => setOpenMenu(openMenu === r.id ? null : r.id)} className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors"><MoreHorizontal size={18} /></button>
+                          <button ref={el => { if (el) btnRefs.current[r.id] = el; }} onClick={(e) => { e.stopPropagation(); setOpenMenu(openMenu === r.id ? null : r.id);
+                            if (btnRefs.current[r.id]) { const rect = btnRefs.current[r.id].getBoundingClientRect();
+                              setMenuPos({ top: rect.bottom + 4, right: document.documentElement.clientWidth - rect.right }); }
+                          }} className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors"><MoreHorizontal size={18} /></button>
                           {openMenu === r.id && (
                             <><div className="fixed inset-0 z-40" onClick={() => setOpenMenu(null)}></div>
-                              <div className="absolute right-0 mt-1 w-36 bg-[#1A1D2E] border border-white/10 rounded-xl shadow-2xl shadow-black/50 py-1.5 z-50 overflow-hidden">
+                              <div className="fixed z-50 w-36 bg-[#1A1D2E] border border-white/10 rounded-xl shadow-2xl shadow-black/50 py-1.5 overflow-hidden"
+                                   style={{ top: menuPos.top + 'px', right: menuPos.right + 'px' }}>
                                 <button onClick={() => { handleDetail(r.id); setOpenMenu(null); }} className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5">Detail</button>
                                 {r.status === 'aktif' && <button onClick={() => { handleRetur(r.id); setOpenMenu(null); }} className="w-full text-left px-4 py-2 text-sm text-amber-400 hover:bg-white/5">Tandai Retur</button>}
                                 {r.status === 'aktif' && <button onClick={() => { handleCancel(r.id); setOpenMenu(null); }} className="w-full text-left px-4 py-2 text-sm text-gray-400 hover:text-white hover:bg-white/5">Batalkan</button>}
