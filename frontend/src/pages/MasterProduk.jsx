@@ -5,8 +5,8 @@ function MasterProduk({ toko }) {
   const [produks, setProduks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [groupBy, setGroupBy] = useState(null); // { nama: string, variants: [] }
-  const [modal, setModal] = useState(null); // { variant?, bulk? }
+  const [groupBy, setGroupBy] = useState(null); 
+  const [modal, setModal] = useState(null); 
 
   useEffect(() => { fetchProduks(); }, [toko.id]);
 

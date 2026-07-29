@@ -1,7 +1,7 @@
 const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const path = require('path');
-const XLSX = require('xlsx');
+const ExcelJS = require('exceljs');
 
 const BASE_DIR = 'D:/SINERGIA ELEKTRIK/Customer Offline';
 
@@ -120,30 +120,147 @@ function formatRp(n) {
 /**
  * Generate Excel nota offline
  */
-function generateExcel(data) {
-  const wb = XLSX.utils.book_new();
-  const wsData = [];
+async function generateExcel(data) {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'ResiApp';
+  const ws = wb.addWorksheet('NOTA');
 
-  wsData.push(['NOTA OFFLINE']);
-  wsData.push(['No Invoice', data.no_invoice]);
-  wsData.push(['Tanggal', data.tgl]);
-  wsData.push(['Pembeli', data.pembeli]);
-  if (data.alamat) wsData.push(['Alamat', data.alamat]);
-  wsData.push([]);
-  wsData.push(['No', 'Nama Barang', 'Qty', 'Harga', 'Subtotal']);
+  ws.columns = [
+    { key: 'a', width: 6 },
+    { key: 'b', width: 30 },
+    { key: 'c', width: 8 },
+    { key: 'd', width: 15 },
+    { key: 'e', width: 18 },
+  ];
+
+  const clrHeader = 'D9D9D9';
+  const clrBody = 'F2EFE9';
+  const clrBorder = '808080';
+
+  function styleRow(row, bgColor, fontBold, fontSize) {
+    row.eachCell({ includeEmpty: true }, (cell) => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
+      cell.font = { name: 'Calibri', size: fontSize || 10, bold: !!fontBold, color: { argb: '000000' } };
+      cell.alignment = { vertical: 'middle', wrapText: true };
+      cell.border = {
+        top: { style: 'thin', color: { argb: clrBorder } },
+        bottom: { style: 'thin', color: { argb: clrBorder } },
+        left: { style: 'thin', color: { argb: clrBorder } },
+        right: { style: 'thin', color: { argb: clrBorder } },
+      };
+    });
+  }
+
+  ws.mergeCells(1, 1, 1, 5);
+  const titleCell = ws.getCell('A1');
+  titleCell.value = 'NOTA OFFLINE';
+  titleCell.font = { name: 'Calibri', size: 16, bold: true };
+  titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+  ws.getRow(1).height = 30;
+
+  ws.mergeCells(2, 1, 2, 3);
+  ws.getCell('D2').value = 'Pembeli';
+  ws.getCell('D2').alignment = { horizontal: 'right', vertical: 'middle' };
+  ws.getCell('D2').font = { name: 'Calibri', size: 11, bold: true };
+  ws.mergeCells(2, 4, 2, 5);
+  ws.getCell('E2').value = data.pembeli;
+  ws.getCell('E2').alignment = { horizontal: 'left', vertical: 'middle' };
+
+  ws.mergeCells(3, 1, 3, 3);
+  ws.getCell('D3').value = 'Tanggal';
+  ws.getCell('D3').alignment = { horizontal: 'right', vertical: 'middle' };
+  ws.getCell('D3').font = { name: 'Calibri', size: 11, bold: true };
+  ws.mergeCells(3, 4, 3, 5);
+  ws.getCell('E3').value = data.tgl;
+  ws.getCell('E3').alignment = { horizontal: 'left', vertical: 'middle' };
+
+  // Alamat optional
+  let curRow = 4;
+  if (data.alamat) {
+    ws.mergeCells(curRow, 1, curRow, 3);
+    ws.getCell('D' + curRow).value = 'Alamat';
+    ws.getCell('D' + curRow).alignment = { horizontal: 'right' };
+    ws.getCell('D' + curRow).font = { bold: true };
+    ws.mergeCells(curRow, 4, curRow, 5);
+    ws.getCell('E' + curRow).value = data.alamat;
+    ws.getCell('E' + curRow).alignment = { horizontal: 'left' };
+    curRow++;
+  }
+
+  curRow++; // spacer
+  // Table header
+  const hRow = ws.getRow(curRow);
+  hRow.getCell(1).value = 'NO';
+  hRow.getCell(2).value = 'NAMA BARANG';
+  hRow.getCell(3).value = 'QTY';
+  hRow.getCell(4).value = 'HARGA';
+  hRow.getCell(5).value = 'SUBTOTAL';
+  styleRow(hRow, clrHeader, true, 10);
+  hRow.height = 22;
+  curRow++;
+
   data.items.forEach((item, i) => {
-    wsData.push([i + 1, item.nama_produk + (item.variasi ? ' (' + item.variasi + ')' : ''), item.qty, item.harga, item.subtotal]);
+    const r = ws.getRow(curRow + i);
+    r.getCell(1).value = i + 1;
+    r.getCell(2).value = item.nama_produk;
+    r.getCell(3).value = item.qty;
+    r.getCell(4).value = item.harga;
+    r.getCell(4).numFmt = 'Rp #,##0';
+    r.getCell(5).value = item.subtotal;
+    r.getCell(5).numFmt = 'Rp #,##0';
+    styleRow(r, clrBody, false, 10);
+    r.height = 20;
   });
-  wsData.push([]);
-  wsData.push(['Total Barang', '', '', '', data.subtotal_barang]);
-  if (data.ongkir > 0) wsData.push(['Ongkos Kirim', '', '', '', data.ongkir]);
-  if (data.biaya_lain > 0) wsData.push(['Biaya Lain', '', '', '', data.biaya_lain]);
-  wsData.push(['GRAND TOTAL', '', '', '', data.grand_total]);
 
-  const ws = XLSX.utils.aoa_to_sheet(wsData);
-  ws['!cols'] = [{ wch: 5 }, { wch: 35 }, { wch: 8 }, { wch: 15 }, { wch: 15 }];
-  XLSX.utils.book_append_sheet(wb, ws, 'NOTA');
-  return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+  curRow += data.items.length;
+  curRow++; // spacer
+
+  const f1 = ws.getRow(curRow);
+  ws.mergeCells(curRow, 1, curRow, 4);
+  f1.getCell(1).value = 'TOTAL BARANG';
+  f1.getCell(1).font = { name: 'Calibri', size: 11, bold: true };
+  f1.getCell(1).alignment = { horizontal: 'right', vertical: 'middle' };
+  f1.getCell(5).value = data.subtotal_barang;
+  f1.getCell(5).numFmt = 'Rp #,##0';
+  f1.getCell(5).font = { bold: true };
+  styleRow(f1, clrBody, false, 11);
+  curRow++;
+
+  if (data.ongkir > 0) {
+    const r = ws.getRow(curRow);
+    ws.mergeCells(curRow, 1, curRow, 4);
+    r.getCell(1).value = 'ONGKOS KIRIM';
+    r.getCell(1).alignment = { horizontal: 'right' };
+    r.getCell(5).value = data.ongkir;
+    r.getCell(5).numFmt = 'Rp #,##0';
+    styleRow(r, clrBody, false, 10);
+    curRow++;
+  }
+  if (data.biaya_lain > 0) {
+    const r = ws.getRow(curRow);
+    ws.mergeCells(curRow, 1, curRow, 4);
+    r.getCell(1).value = 'BIAYA LAIN';
+    r.getCell(1).alignment = { horizontal: 'right' };
+    r.getCell(5).value = data.biaya_lain;
+    r.getCell(5).numFmt = 'Rp #,##0';
+    styleRow(r, clrBody, false, 10);
+    curRow++;
+  }
+
+  curRow++;
+  const gf = ws.getRow(curRow);
+  ws.mergeCells(curRow, 1, curRow, 4);
+  gf.getCell(1).value = 'GRAND TOTAL';
+  gf.getCell(1).font = { name: 'Calibri', size: 13, bold: true };
+  gf.getCell(1).alignment = { horizontal: 'right', vertical: 'middle' };
+  gf.getCell(5).value = data.grand_total;
+  gf.getCell(5).numFmt = 'Rp #,##0';
+  gf.getCell(5).font = { name: 'Calibri', size: 13, bold: true };
+  styleRow(gf, clrHeader, true, 13);
+  gf.height = 28;
+
+  const buf = await wb.xlsx.writeBuffer();
+  return buf;
 }
 
 module.exports = { getCustomerDir, getNextInvoiceNumber, invoiceFileName, generatePDF, generateExcel, formatRp };

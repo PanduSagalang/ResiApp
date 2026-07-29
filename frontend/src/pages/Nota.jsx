@@ -12,6 +12,9 @@ function Nota({ toko }) {
   const [filterLabel, setFilterLabel] = useState('Hari Ini');
 
   const [showOffline, setShowOffline] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [histori, setHistori] = useState([]);
+  const [histLoading, setHistLoading] = useState(false);
   const [masterProduk, setMasterProduk] = useState([]);
   const [offlineForm, setOfflineForm] = useState({ pembeli: '', alamat: '', ongkir: '', biaya_lain: '', items: [{ produk_master_id: '', nama: '', qty: 1, harga: '' }] });
   const [isSaving, setIsSaving] = useState(false);
@@ -32,6 +35,24 @@ function Nota({ toko }) {
       setData(res.data.data || null);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
+  };
+
+  const fetchHistory = async () => {
+    try { setHistLoading(true);
+      const res = await notaAPI.offlineHistory();
+      setHistori(res.data.data || []);
+      setShowHistory(true);
+    } catch (err) { alert('Gagal muat riwayat'); }
+    finally { setHistLoading(false); }
+  };
+
+  const downloadOffline = async (customer, filename) => {
+    try {
+      const res = await notaAPI.offlineDownload(customer, filename);
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      const link = document.createElement('a'); link.href = url; link.setAttribute('download', filename);
+      document.body.appendChild(link); link.click(); link.remove();
+    } catch (err) { alert('Gagal download'); }
   };
 
   const handleExportExcel = async () => {
@@ -128,6 +149,9 @@ function Nota({ toko }) {
           <button onClick={() => setShowOffline(true)} className={`${btnBase} bg-emerald-600 text-white hover:bg-emerald-700 active:bg-emerald-800`}>
             + Nota Offline
           </button>
+          <button onClick={fetchHistory} className={`${btnBase} bg-white/5 text-gray-300 border border-white/10 hover:bg-white/10`}>
+            Riwayat Offline
+          </button>
           <button onClick={handleExportExcel} className={`${btnBase} bg-purple-600 text-white hover:bg-purple-700 active:bg-purple-800`}>
             <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
             Export Excel
@@ -164,7 +188,7 @@ function Nota({ toko }) {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gradient-to-r from-purple-500/20 to-blue-500/20">
-                    {['No', 'Produk', 'Variasi', 'Qty', 'Harga (HPP)', 'Subtotal'].map(h => (
+                    {['No', 'Produk', 'Variasi', 'Status', 'Qty', 'Harga (HPP)', 'Subtotal'].map(h => (
                       <th key={h} className="px-3 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">{h}</th>
                     ))}
                   </tr>
@@ -175,9 +199,14 @@ function Nota({ toko }) {
                       <td className="px-3 py-3 text-gray-400">{i + 1}</td>
                       <td className="px-3 py-3 text-gray-100 max-w-[200px] truncate" title={item.nama_produk}>{item.nama_produk}</td>
                       <td className="px-3 py-3 text-gray-400">{item.variasi || '-'}</td>
-                      <td className="px-3 py-3 text-right">{item.qty}</td>
-                      <td className="px-3 py-3 text-right text-gray-400 whitespace-nowrap">Rp {fmt(item.harga_satuan)}</td>
-                      <td className="px-3 py-3 text-right font-medium text-gray-100 whitespace-nowrap">Rp {fmt(item.subtotal)}</td>
+                      <td className="px-3 py-3">
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${item.status?.includes('aktif') ? 'bg-emerald-500/15 text-emerald-400' : item.status?.includes('retur') ? 'bg-amber-500/15 text-amber-400' : 'bg-rose-500/15 text-rose-400'}`}>
+                          {item.status}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 text-right text-gray-200">{item.qty}</td>
+                      <td className="px-3 py-3 text-right text-gray-400 whitespace-nowrap">Rp {fmt(item.harga_beli)}</td>
+                      <td className="px-3 py-3 text-right font-medium text-gray-100 whitespace-nowrap">Rp {fmt(item.subtotal_beli)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -196,6 +225,39 @@ function Nota({ toko }) {
                 <p className="text-xs text-gray-400 font-medium">Jumlah Resi</p>
                 <p className="text-lg font-bold text-white mt-1">{data.total_resi}</p>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Riwayat Offline */}
+      {showHistory && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowHistory(false)}>
+          <div className="bg-[#111322] rounded-2xl shadow-2xl border border-white/5 max-w-2xl w-full mx-4 max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="border-b border-white/5 p-5 flex justify-between items-center bg-[#1A1D2E] rounded-t-2xl">
+              <h2 className="text-lg font-bold text-white">Riwayat Nota Offline</h2>
+              <button onClick={() => setShowHistory(false)} className="text-gray-400 hover:text-white">&times;</button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-5">
+              {histLoading ? (
+                <div className="flex justify-center py-10"><div className="animate-spin rounded-full h-6 w-6 border-2 border-purple-500 border-t-transparent"></div></div>
+              ) : histori.length === 0 ? (
+                <p className="text-gray-400 text-center py-10">Belum ada nota offline.</p>
+              ) : (
+                <div className="space-y-3">
+                  {histori.map((h, i) => (
+                    <div key={i} className="flex items-center justify-between bg-[#1A1D2E] rounded-xl p-4 border border-white/5">
+                      <div>
+                        <p className="text-sm font-semibold text-white">{h.customer}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{h.filename} • {new Date(h.date).toLocaleDateString('id-ID')}</p>
+                      </div>
+                      <button onClick={() => downloadOffline(h.customer, h.filename)} className="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-xs font-semibold hover:bg-purple-700 transition-colors">
+                        Download
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>

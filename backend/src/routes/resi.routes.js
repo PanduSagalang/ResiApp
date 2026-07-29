@@ -135,10 +135,11 @@ router.post('/:id/retur', async (req, res) => {
  */
 router.post('/:id/cancel', async (req, res) => {
   try {
+    const { id } = req.params;
     const resi = await Resi.findByPk(id);
     if (!resi) return res.status(404).json({ success: false, message: 'Not found' });
     await resi.update({ status: 'dibatalkan' });
-    await hitungTransaksi(resi.id);
+    await hitungTransaksi(id);
     return res.json({ success: true, message: 'Resi dibatalkan' });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });

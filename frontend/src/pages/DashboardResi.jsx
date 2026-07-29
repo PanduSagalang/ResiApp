@@ -64,23 +64,33 @@ function DashboardResi({ toko }) {
       </div>
 
       <form onSubmit={handleSearch} className="bg-[#111322]/60 backdrop-blur-sm border border-white/5 rounded-xl p-4 mb-6 shadow-md shadow-black/20">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-          <input type="text" placeholder="Cari..." value={search} onChange={(e) => setSearch(e.target.value)} className="bg-[#1A1D2E] text-white px-3 py-2 border border-white/10 rounded-lg text-sm focus:ring-2 focus:ring-purple-500" />
-          <select value={status} onChange={(e) => setStatus(e.target.value)} className="bg-[#1A1D2E] text-white px-3 py-2 border border-white/10 rounded-lg text-sm focus:ring-2 focus:ring-purple-500">
-            <option value="">Semua Status</option>
-            <option value="aktif">Aktif</option><option value="retur">Retur</option><option value="dibatalkan">Dibatalkan</option>
-          </select>
-          <div className="flex items-center gap-1">
-            <input type="date" value={tglMulai} onChange={(e) => setRange('Filter', e.target.value, tglSelesai)} className="bg-[#1A1D2E] text-white px-2 py-2 border border-white/10 rounded-lg text-sm w-full [color-scheme:dark]" />
-            <span className="text-gray-400 text-[10px]">s/d</span>
-            <input type="date" value={tglSelesai} onChange={(e) => setRange('Filter', tglMulai, e.target.value)} className="bg-[#1A1D2E] text-white px-2 py-2 border border-white/10 rounded-lg text-sm w-full [color-scheme:dark]" />
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex-1 min-w-[140px]">
+            <label className="block text-[10px] text-gray-500 mb-1">Cari</label>
+            <input type="text" placeholder="Cari..." value={search} onChange={(e) => setSearch(e.target.value)} className="bg-[#1A1D2E] text-white w-full px-3 py-2 border border-white/10 rounded-lg text-sm focus:ring-2 focus:ring-purple-500" />
           </div>
-          <div className="flex gap-1">
+          <div className="w-36">
+            <label className="block text-[10px] text-gray-500 mb-1">Status</label>
+            <select value={status} onChange={(e) => setStatus(e.target.value)} className="bg-[#1A1D2E] text-white w-full px-3 py-2 border border-white/10 rounded-lg text-sm focus:ring-2 focus:ring-purple-500">
+              <option value="">Semua</option>
+              <option value="aktif">Aktif</option><option value="retur">Retur</option><option value="dibatalkan">Dibatalkan</option>
+            </select>
+          </div>
+          <div className="flex items-end gap-1">
+            <div><label className="block text-[10px] text-gray-500 mb-1">Dari</label>
+              <input type="date" value={tglMulai} onChange={(e) => setRange('Filter', e.target.value, tglSelesai)} className="bg-[#1A1D2E] text-white px-2 py-2 border border-white/10 rounded-lg text-sm w-32 [color-scheme:dark]" />
+            </div>
+            <span className="text-gray-400 text-[10px] pb-2.5">s/d</span>
+            <div><label className="block text-[10px] text-gray-500 mb-1">Ke</label>
+              <input type="date" value={tglSelesai} onChange={(e) => setRange('Filter', tglMulai, e.target.value)} className="bg-[#1A1D2E] text-white px-2 py-2 border border-white/10 rounded-lg text-sm w-32 [color-scheme:dark]" />
+            </div>
+          </div>
+          <div className="flex gap-1 pb-0.5">
             {presets.map(p => (
-              <button key={p.label} type="button" onClick={p.fn} className={`text-[10px] px-2 py-1 rounded-lg font-medium transition-all ${filterLabel === p.label ? 'bg-purple-600 text-white' : 'bg-white/5 text-gray-400 hover:bg-purple-500/10 hover:text-purple-400'}`}>{p.label}</button>
+              <button key={p.label} type="button" onClick={p.fn} className={`text-[10px] px-2.5 py-1.5 rounded-lg font-medium transition-all ${filterLabel === p.label ? 'bg-purple-600 text-white' : 'bg-white/5 text-gray-400 hover:bg-purple-500/10 hover:text-purple-400'}`}>{p.label}</button>
             ))}
           </div>
-          <button type="submit" className="bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700 text-sm font-medium shadow-md transition-all">Cari</button>
+          <button type="submit" className="bg-purple-600 text-white px-5 py-2 rounded-lg hover:bg-purple-700 text-sm font-medium shadow-md transition-all">Cari</button>
         </div>
       </form>
 

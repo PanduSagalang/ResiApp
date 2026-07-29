@@ -7,32 +7,39 @@ const Transaksi = db.Transaksi;
 
 async function hitungTransaksi(resiId) {
   try {
-    const items = await ResiItem.findAll({
-      where: { resi_id: resiId },
-      include: [{ model: ProdukMaster, as: 'produk_master', required: false }]
-    });
-
+    const resi = await db.Resi.findByPk(resiId, { include: [{ model: db.Retur, as: 'retur' }] });
+    if (!resi) throw new Error('Resi not found');
+    
     let hpp_total = 0, harga_jual_total = 0;
+    let pk = 0, pb = 0, ppn = 0, admin_fee = 0;
+    let potRetur = parseFloat(resi.retur?.jumlah_potongan) || 0;
 
-    for (const item of items) {
-      const qty = item.qty || 1;
-      if (item.produk_master) {
-        const hb = parseFloat(item.produk_master.harga_beli) || 0;
-        const hj = parseFloat(item.produk_master.harga_jual) || 0;
-        hpp_total += hb * qty;
-        harga_jual_total += hj * qty;
+    // If cancelled or returned, ALL values stay 0
+    if (resi.status !== 'dibatalkan' && resi.status !== 'retur') {
+      const items = await ResiItem.findAll({
+        where: { resi_id: resiId },
+        include: [{ model: ProdukMaster, as: 'produk_master', required: false }]
+      });
+
+      for (const item of items) {
+        const qty = item.qty || 1;
+        if (item.produk_master) {
+          const hb = parseFloat(item.produk_master.harga_beli) || 0;
+          const hj = parseFloat(item.produk_master.harga_jual) || 0;
+          hpp_total += hb * qty;
+          harga_jual_total += hj * qty;
+        }
       }
     }
 
-    // PPN = 10% dari total harga_jual
-    const ppn = harga_jual_total * 0.1;
-    // Admin fee flat Rp1.250 per transaksi
-    const admin_fee = 1250;
-
-    const pk = harga_jual_total - hpp_total;
-    const resi = await db.Resi.findByPk(resiId, { include: [{ model: db.Retur, as: 'retur' }] });
-    const potRetur = resi?.retur ? parseFloat(resi.retur.jumlah_potongan) || 0 : 0;
-    const pb = pk - admin_fee - ppn - potRetur;
+    if (resi.status === 'aktif') {
+      // Full calculation
+      ppn = harga_jual_total * 0.1;
+      admin_fee = 1250;
+      pk = harga_jual_total - hpp_total;
+      pb = pk - admin_fee - ppn - potRetur;
+    }
+    // retur and dibatalkan: hpp_total, harga_jual_total, pk, pb already 0
 
     let t = await Transaksi.findOne({ where: { resi_id: resiId } });
     const vals = { hpp_total, harga_jual_total, admin_fee, ppn, potongan_retur: potRetur, penghasilan_kotor: pk, penghasilan_bersih: pb };
@@ -94,7 +101,7 @@ async function recalculateTokoTransaksi(tokoId) {
  * GET /api/dashboard/summary/:tokoId — cards ringkasan
  */
 async function getDashboardSummary(tokoId, tglMulai, tglSelesai) {
-  const where = { toko_id: tokoId, tanggal_pesan: { [Op.between]: [tglMulai, tglSelesai] } };
+  const where = { toko_id: tokoId, status: 'aktif', tanggal_pesan: { [Op.between]: [tglMulai, tglSelesai] } };
   const resis = await db.Resi.findAll({ where, attributes: ['id'], include: [{ model: Transaksi, as: 'transaksi', required: true }] });
   let totalKotor = 0, totalBersih = 0, totalJual = 0;
   for (const r of resis) {

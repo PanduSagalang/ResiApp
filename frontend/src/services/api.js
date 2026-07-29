@@ -93,6 +93,8 @@ export const nota = {
   getRekap: (tokoId, params) => api.get(`/nota/toko/${tokoId}/bulanan`, { params }),
   exportExcel: (tokoId, params) => api.get(`/nota/toko/${tokoId}/export-excel`, { params, responseType: 'blob' }),
   offline: (tokoId, data) => api.post(`/nota/offline/${tokoId}`, data),
+  offlineHistory: () => api.get('/nota/offline/history'),
+  offlineDownload: (customer, filename) => api.get('/nota/offline/download', { params: { customer, filename }, responseType: 'blob' }),
 };
 
 export default api;
