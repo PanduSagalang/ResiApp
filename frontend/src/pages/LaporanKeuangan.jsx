@@ -8,10 +8,10 @@ function LaporanKeuangan({ toko }) {
   const [summary, setSummary] = useState(null);
   const [chartData, setChartData] = useState([]);
   const [loading, setLoading] = useState(false);
-  const start7 = new Date(); start7.setDate(start7.getDate() - 7);
-  const [tglMulai, setTglMulai] = useState(start7.toISOString().split('T')[0]);
-  const [tglSelesai, setTglSelesai] = useState(new Date().toISOString().split('T')[0]);
-  const [filterLabel, setFilterLabel] = useState('7 Hari Terakhir');
+  const today = new Date().toISOString().split('T')[0];
+  const [tglMulai, setTglMulai] = useState(today);
+  const [tglSelesai, setTglSelesai] = useState(today);
+  const [filterLabel, setFilterLabel] = useState('Hari Ini');
 
   useEffect(() => {
     if (tglMulai && tglSelesai) fetchData();

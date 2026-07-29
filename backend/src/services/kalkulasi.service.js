@@ -96,15 +96,16 @@ async function recalculateTokoTransaksi(tokoId) {
 async function getDashboardSummary(tokoId, tglMulai, tglSelesai) {
   const where = { toko_id: tokoId, tanggal_pesan: { [Op.between]: [tglMulai, tglSelesai] } };
   const resis = await db.Resi.findAll({ where, attributes: ['id'], include: [{ model: Transaksi, as: 'transaksi', required: true }] });
-  let totalKotor = 0, totalBersih = 0;
+  let totalKotor = 0, totalBersih = 0, totalJual = 0;
   for (const r of resis) {
     const t = r.transaksi;
     if (t) {
       totalKotor += parseFloat(t.penghasilan_kotor) || 0;
       totalBersih += parseFloat(t.penghasilan_bersih) || 0;
+      totalJual += parseFloat(t.harga_jual_total) || 0;
     }
   }
-  return { total_pesanan: resis.length, total_kotor: totalKotor, total_bersih: totalBersih };
+  return { total_pesanan: resis.length, total_jual: totalJual, total_kotor: totalKotor, total_bersih: totalBersih };
 }
 
 module.exports = { hitungTransaksi, autoMatchProduk, recalculateTokoTransaksi, getDashboardSummary };

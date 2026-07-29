@@ -90,6 +90,7 @@ export const laporan = {
 export const nota = {
   get: (resiId) => api.get(`/nota/resi/${resiId}`),
   bulanan: (tokoId, params) => api.get(`/nota/toko/${tokoId}/bulanan`, { params }),
+  getRekap: (tokoId, params) => api.get(`/nota/toko/${tokoId}/bulanan`, { params }),
   exportExcel: (tokoId, params) => api.get(`/nota/toko/${tokoId}/export-excel`, { params, responseType: 'blob' }),
   offline: (tokoId, data) => api.post(`/nota/offline/${tokoId}`, data),
 };
