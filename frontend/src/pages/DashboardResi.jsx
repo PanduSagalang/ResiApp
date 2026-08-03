@@ -4,22 +4,47 @@ import api from '../services/api';
 import { MoreHorizontal } from 'lucide-react';
 
 function DashboardResi({ toko }) {
+  const today = new Date().toISOString().split('T')[0];
+  
+  // Initialize state from URL params
+  const initFromURL = () => {
+    const params = new URLSearchParams(window.location.search);
+    return {
+      tglMulai: params.get('tglMulai') || today,
+      tglSelesai: params.get('tglSelesai') || today,
+      filterLabel: params.get('filterLabel') || 'Hari Ini',
+      status: params.get('status') || '',
+      search: params.get('search') || '',
+    };
+  };
+
+  const init = initFromURL();
   const [resis, setResis] = useState([]);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('');
-  const today = new Date().toISOString().split('T')[0];
-  const [tglMulai, setTglMulai] = useState(today);
-  const [tglSelesai, setTglSelesai] = useState(today);
-  const [filterLabel, setFilterLabel] = useState('Hari Ini');
+  const [search, setSearch] = useState(init.search);
+  const [status, setStatus] = useState(init.status);
+  const [tglMulai, setTglMulai] = useState(init.tglMulai);
+  const [tglSelesai, setTglSelesai] = useState(init.tglSelesai);
+  const [filterLabel, setFilterLabel] = useState(init.filterLabel);
   const [detail, setDetail] = useState(null);
   const [selected, setSelected] = useState([]);
   const [openMenu, setOpenMenu] = useState(null);
   const btnRefs = useRef({});
   const [menuPos, setMenuPos] = useState({ top: 0, right: 0 });
 
-  useEffect(() => { fetchResis(); }, [toko.id]);
+  // Sync filter state to URL
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (tglMulai) params.set('tglMulai', tglMulai);
+    if (tglSelesai) params.set('tglSelesai', tglSelesai);
+    if (filterLabel && filterLabel !== 'Hari Ini') params.set('filterLabel', filterLabel);
+    if (status) params.set('status', status);
+    if (search) params.set('search', search);
+    window.history.replaceState({}, '', `?${params.toString()}`);
+  }, [tglMulai, tglSelesai, filterLabel, status, search]);
+
+  useEffect(() => { fetchResis(); }, [toko.id, tglMulai, tglSelesai, status, search]);
 
   const fetchResis = async () => {
     try { setLoading(true);
